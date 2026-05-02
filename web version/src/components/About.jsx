@@ -34,6 +34,17 @@ function About() {
           Excluded)&quot; panel.
         </p>
 
+        <aside className="about-tip" role="note">
+          <strong className="about-tip-label">Tip</strong>
+          <p className="about-tip-text">
+            In <strong>Edit moves</strong>, switch scan mode to <strong>Manual</strong> and define your{' '}
+            <strong>scan area</strong> (draw the rectangle on a reference frame) <em>before</em> you run{' '}
+            <strong>Identify by All All</strong>. That limits which pixels are analyzed—usually wrists and sleeves—so
+            clustering is not dominated by unrelated background or the table. Use the same manual bounds before cloth or
+            color batch passes when you want a consistent region.
+          </p>
+        </aside>
+
         <div className="about-table-wrap">
           <table className="about-methods-table">
             <caption className="about-table-caption">
@@ -75,7 +86,8 @@ function About() {
                   map to Player A/B using session <strong>bracelet colors</strong> and any existing labels. The{' '}
                   <strong>BG sensitivity</strong> slider makes background filtering stricter or looser. Results appear
                   under <strong>All-All Styles Analytics (Background Excluded)</strong>, with optional swap if A/B are
-                  reversed. Modes: <strong>all moves</strong> or <strong>unknown only</strong>.
+                  reversed. Modes: <strong>all moves</strong> or <strong>unknown only</strong>. Prefer setting a{' '}
+                  <strong>Manual</strong> scan area first (see tip above).
                 </td>
               </tr>
               <tr>

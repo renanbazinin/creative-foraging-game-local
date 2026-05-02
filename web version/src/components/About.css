@@ -53,6 +53,31 @@
   color: #333;
 }
 
+.about-tip {
+  margin: 0 0 18px;
+  padding: 12px 14px 12px 16px;
+  border-radius: 8px;
+  border: 1px solid #ffe0b2;
+  border-left: 4px solid #ff9800;
+  background: #fff8e1;
+}
+
+.about-tip-label {
+  display: block;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #e65100;
+  margin-bottom: 6px;
+}
+
+.about-tip-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #333;
+}
+
 .about-table-wrap {
   overflow-x: auto;
   margin: 0 -4px 14px;
