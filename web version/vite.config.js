@@ -9,6 +9,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
       manifest: {
+        id: '/creative-foraging-game-local/',
         name: 'Creative Foraging – Bracelet Detector',
         short_name: 'Creative Foraging',
         description:
@@ -30,7 +31,29 @@ export default defineConfig({
             src: 'pwa-512.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any maskable',
+            purpose: 'any',
+          },
+          {
+            src: 'pwa-512-maskable.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
+        ],
+        screenshots: [
+          {
+            src: 'pwa-screenshot-wide.png',
+            type: 'image/png',
+            sizes: '1280x720',
+            form_factor: 'wide',
+            label: 'Creative Foraging (desktop)',
+          },
+          {
+            src: 'pwa-screenshot-narrow.png',
+            type: 'image/png',
+            sizes: '540x720',
+            form_factor: 'narrow',
+            label: 'Creative Foraging (mobile)',
           },
         ],
       },
