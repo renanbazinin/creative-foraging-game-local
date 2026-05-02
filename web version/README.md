@@ -9,28 +9,38 @@ A web-based implementation of the Creative Foraging Game with integrated bracele
 - **Practice & Experiment Modes**: Start with practice, then switch to timed experiment
 - **Bracelet Detector**: Real-time hand tracking with red/blue color detection
 - **CSV Logging**: Automatic logging of all actions with download capability
-- **Client-Side Only**: No server required, runs entirely in the browser
+- **Local sessions (no cloud)**: Under your chosen folder, each experiment is saved as `sessions/<session-id>/session.json` plus `session.csv` (same columns as Admin CSV export). Both files update together whenever data changes. The app does not use a backend server.
 
 ## Quick Start
 
 ### Installation
 
 ```powershell
-# Navigate to the project folder
-cd "C:\cfg\CreativeForaging\web version"
-
-# Install dependencies
+cd "path\to\Creative-Foraging-Detection-Media-Pipe\web version"
 npm install
 ```
 
-### Running the Game
+### Running the game
 
 ```powershell
-# Start development server
 npm run dev
 ```
 
-The game will open at `http://localhost:3000`
+Open the URL Vite prints (usually `http://localhost:5173`). **Allow the browser to access the folder** when prompted. Session files are written under `sessions/<experiment-id>/` as `session.json` and `session.csv`.
+
+### Production build (static files only)
+
+```powershell
+npm run build
+```
+
+Deploy the `dist/` folder to any static host (e.g. GitHub Pages), or preview locally:
+
+```powershell
+npm run preview
+```
+
+Camera, MediaPipe, and folder access work best over **HTTPS** or **localhost** (not `file://`).
 
 ## Configuration
 
@@ -179,6 +189,21 @@ Output will be in `dist/` folder.
 ```powershell
 npm run preview
 ```
+
+Live site (GitHub Pages): [https://renanbazinin.github.io/creative-foraging-game-local/](https://renanbazinin.github.io/creative-foraging-game-local/)
+
+### Deploy to GitHub Pages
+
+The Vite `base` path is set to `/creative-foraging-game-local/` for the project site. In the repository **Settings → Pages**, set the source to the `gh-pages` branch (or use the flow below which publishes that branch).
+
+From this folder (`web version`):
+
+```powershell
+npm install
+npm run deploy
+```
+
+That runs `predeploy` (`vite build`) then `gh-pages -d dist`, pushing the built assets to the `gh-pages` branch. Ensure GitHub Pages uses that branch.
 
 ## Troubleshooting
 

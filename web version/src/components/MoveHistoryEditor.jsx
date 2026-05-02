@@ -1,6 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getApiBaseUrl } from '../config/api.config';
 import './MoveHistoryEditor.css';
+import {
+  getActiveDataRoot,
+  restoreDataRootFromStorage,
+  getSessionByGameId,
+  updateMovePlayer,
+  updateMovePlayersBatch,
+  getMoveId
+} from '../services/localSessionStore';
 import { identifyPlayerByColor, identifyPlayerBySegmentation, identifyPlayersByCloth } from '../utils/colorDetector';
 import { identifyPlayersByAllAll } from '../utils/colorDetectorGeneral';
 import { swapPlayersAB } from '../utils/swapPlayers';
@@ -8,9 +15,6 @@ import ColorPreviewModal from './ColorPreviewModal';
 import ManualScanSelector from './ManualScanSelector';
 import SwipeView from './SwipeView';
 import ConfirmSwapModal from './ConfirmSwapModal';
-
-const API_BASE_URL = getApiBaseUrl();
-const ADMIN_PASSWORD_KEY = 'adminPassword';
 
 const formatNumber = (value, decimals = 2) => {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
@@ -42,12 +46,8 @@ function MoveHistoryEditor({ sessionGameId }) {
   const [expandedImage, setExpandedImage] = useState(null);
   const [filterPhase, setFilterPhase] = useState('all');
   const [filterPlayer, setFilterPlayer] = useState('all');
-  const [password, setPassword] = useState('');
+  const [dataRoot, setDataRoot] = useState(() => getActiveDataRoot());
 
-  // AI identification state
-  const [aiProcessing, setAiProcessing] = useState(false);
-  const [aiSuggestions, setAiSuggestions] = useState({});
-  const [aiProgress, setAiProgress] = useState({ current: 0, total: 0 });
   const [colorA, setColorA] = useState('#FF0000'); // Default red
   const [colorB, setColorB] = useState('#0000FF'); // Default blue
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -64,7 +64,6 @@ function MoveHistoryEditor({ sessionGameId }) {
   const [clothAnalytics, setClothAnalytics] = useState(null);
   const [clothDebugPreviews, setClothDebugPreviews] = useState({}); // { moveId: debugPreview }
   const [showDebugView, setShowDebugView] = useState(false); // Toggle for all moves
-  const [aiRetryStatus, setAiRetryStatus] = useState(''); // For showing retry messages
   const [allAllProcessing, setAllAllProcessing] = useState(false);
   const [allAllAnalytics, setAllAllAnalytics] = useState(null);
   const [analyticsSort, setAnalyticsSort] = useState('chronological');
@@ -112,19 +111,31 @@ function MoveHistoryEditor({ sessionGameId }) {
     [colorA, colorB, colorAnchor, colorScanPercentage, manualScanBounds]
   );
 
-  // Load password from localStorage
   useEffect(() => {
-    const savedPassword = localStorage.getItem(ADMIN_PASSWORD_KEY);
-    if (savedPassword) {
-      setPassword(savedPassword);
-    }
+    let cancelled = false;
+    (async () => {
+      const h = await restoreDataRootFromStorage();
+      if (!cancelled && h) {
+        setDataRoot(h);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
-    if (sessionGameId && password) {
-      loadSession();
+    if (!sessionGameId) return;
+    const root = dataRoot || getActiveDataRoot();
+    if (!root) {
+      setLoading(false);
+      setError(
+        'No data folder connected. Open Admin and choose the same folder you use for saving sessions.'
+      );
+      return;
     }
-  }, [sessionGameId, password]);
+    loadSession();
+  }, [sessionGameId, dataRoot]);
 
   // Helper function to convert HSV to Hex
   const hsvToHex = (calib) => {
@@ -155,20 +166,13 @@ function MoveHistoryEditor({ sessionGameId }) {
   };
 
   const loadSession = async () => {
-    if (!password) return;
+    const root = dataRoot || getActiveDataRoot();
+    if (!root || !sessionGameId) return;
 
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/sessions/${encodeURIComponent(sessionGameId)}`, {
-        headers: {
-          'x-admin-password': password
-        }
-      });
-      if (!response.ok) {
-        throw new Error(`Failed to load session (${response.status})`);
-      }
-      const data = await response.json();
+      const data = await getSessionByGameId(root, sessionGameId);
       setSession(data);
 
       // Try to get colors from multiple locations (priority order)
@@ -227,41 +231,20 @@ function MoveHistoryEditor({ sessionGameId }) {
   };
 
   const handlePlayerUpdate = async (moveId, newPlayer) => {
-    if (!sessionGameId || !moveId || !password) return;
+    const root = dataRoot || getActiveDataRoot();
+    if (!sessionGameId || !moveId || !root) return;
 
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/sessions/${encodeURIComponent(sessionGameId)}/moves/${encodeURIComponent(moveId)}`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-admin-password': password
-          },
-          body: JSON.stringify({ player: newPlayer })
-        }
-      );
+      await updateMovePlayer(root, sessionGameId, moveId, newPlayer);
 
-      if (!response.ok) {
-        throw new Error(`Failed to update player (${response.status})`);
-      }
-
-      // Update local state
-      setSession(prev => {
+      setSession((prev) => {
         if (!prev) return prev;
         return {
           ...prev,
-          moves: prev.moves.map(move =>
-            move._id === moveId ? { ...move, player: newPlayer } : move
+          moves: prev.moves.map((move) =>
+            getMoveId(move) === moveId ? { ...move, player: newPlayer } : move
           )
         };
-      });
-
-      // Remove AI suggestion for this move after manual update
-      setAiSuggestions(prev => {
-        const updated = { ...prev };
-        delete updated[moveId];
-        return updated;
       });
 
       console.log('[MoveHistoryEditor] Player updated:', moveId, newPlayer);
@@ -269,185 +252,6 @@ function MoveHistoryEditor({ sessionGameId }) {
       console.error('[MoveHistoryEditor] Error updating player:', err);
       alert('Failed to update player: ' + err.message);
     }
-  };
-
-  const handleAiIdentifyAll = async () => {
-    if (!sessionGameId || !password) return;
-
-    setAiProcessing(true);
-    setAiSuggestions({}); // Clear previous suggestions
-
-    try {
-      console.log('[MoveHistoryEditor] Starting AI identification for all moves...');
-      console.log('[MoveHistoryEditor] 🎨 Using colors - Player A:', colorA, 'Player B:', colorB);
-
-      // Get all moves with camera frames
-      const movesToProcess = filteredMoves.filter(m => m.camera_frame);
-
-      if (movesToProcess.length === 0) {
-        alert('No moves with camera frames to process');
-        return;
-      }
-
-      setAiProgress({ current: 0, total: movesToProcess.length });
-      console.log(`[MoveHistoryEditor] Processing ${movesToProcess.length} moves one by one...`);
-      let processedCount = 0;
-
-      // Process each move individually and update UI immediately
-      for (const move of movesToProcess) {
-        setAiProgress({ current: processedCount + 1, total: movesToProcess.length });
-        try {
-          // Call API for single move
-          const response = await fetch(`${API_BASE_URL}/ai/identify-move`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-admin-password': password
-            },
-            body: JSON.stringify({
-              sessionGameId,
-              moveId: move._id,
-              colorA,
-              colorB,
-              cameraPosition: (colorAnchor === 'top' || colorAnchor === 'bottom') ? colorAnchor : undefined
-            })
-          });
-
-          if (response.ok) {
-            const result = await response.json();
-            setAiRetryStatus(''); // Clear retry status on success
-
-            // Update suggestions immediately for this move
-            setAiSuggestions(prev => ({
-              ...prev,
-              [move._id]: {
-                player: result.suggestion === 'A' ? 'Player A' :
-                  result.suggestion === 'B' ? 'Player B' : 'None',
-                confidence: result.confidence,
-                rawResponse: result.rawResponse
-              }
-            }));
-
-            processedCount++;
-            console.log(`[MoveHistoryEditor] ✅ Processed ${processedCount}/${movesToProcess.length}: ${result.suggestion}`);
-          } else {
-            if (response.status === 503) {
-              setAiRetryStatus('⏳ Retrying...');
-            } else {
-              setAiRetryStatus('');
-            }
-            console.warn(`[MoveHistoryEditor] ⚠️ Failed to process move ${move._id}`);
-          }
-        } catch (err) {
-          setAiRetryStatus('');
-          console.error(`[MoveHistoryEditor] Error processing move ${move._id}:`, err);
-        }
-      }
-
-      console.log('[MoveHistoryEditor] AI identification complete:', processedCount, 'moves processed');
-      alert(`AI identified ${processedCount} moves. Review and confirm suggestions below.`);
-    } catch (err) {
-      console.error('[MoveHistoryEditor] Error in AI identification:', err);
-      alert('AI identification failed: ' + err.message);
-    } finally {
-      setAiProcessing(false);
-      setAiProgress({ current: 0, total: 0 });
-      setAiRetryStatus(''); // Clear retry status
-    }
-  };
-
-  const handleAiIdentifyUnknown = async () => {
-    if (!sessionGameId || !password) return;
-
-    setAiProcessing(true);
-    setAiSuggestions({}); // Clear previous suggestions
-
-    try {
-      console.log('[MoveHistoryEditor] Starting AI identification for unknown moves...');
-      console.log('[MoveHistoryEditor] 🎨 Using colors - Player A:', colorA, 'Player B:', colorB);
-
-      // Get only unknown/none moves with camera frames
-      const movesToProcess = filteredMoves.filter(m =>
-        m.camera_frame && (!m.player || m.player === 'Unknown' || m.player === 'None')
-      );
-
-      if (movesToProcess.length === 0) {
-        alert('No unknown moves with camera frames to process');
-        return;
-      }
-
-      setAiProgress({ current: 0, total: movesToProcess.length });
-      console.log(`[MoveHistoryEditor] Processing ${movesToProcess.length} unknown moves one by one...`);
-      let processedCount = 0;
-
-      // Process each move individually and update UI immediately
-      for (const move of movesToProcess) {
-        setAiProgress({ current: processedCount + 1, total: movesToProcess.length });
-        try {
-          // Call API for single move
-          const response = await fetch(`${API_BASE_URL}/ai/identify-move`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-admin-password': password
-            },
-            body: JSON.stringify({
-              sessionGameId,
-              moveId: move._id,
-              colorA,
-              colorB,
-              cameraPosition: (colorAnchor === 'top' || colorAnchor === 'bottom') ? colorAnchor : undefined
-            })
-          });
-
-          if (response.ok) {
-            const result = await response.json();
-            setAiRetryStatus(''); // Clear retry status on success
-
-            // Update suggestions immediately for this move
-            setAiSuggestions(prev => ({
-              ...prev,
-              [move._id]: {
-                player: result.suggestion === 'A' ? 'Player A' :
-                  result.suggestion === 'B' ? 'Player B' : 'None',
-                confidence: result.confidence,
-                rawResponse: result.rawResponse
-              }
-            }));
-
-            processedCount++;
-            console.log(`[MoveHistoryEditor] ✅ Processed ${processedCount}/${movesToProcess.length}: ${result.suggestion}`);
-          } else {
-            if (response.status === 503) {
-              setAiRetryStatus('⏳ Retrying...');
-            } else {
-              setAiRetryStatus('');
-            }
-            console.warn(`[MoveHistoryEditor] ⚠️ Failed to process move ${move._id}`);
-          }
-        } catch (err) {
-          setAiRetryStatus('');
-          console.error(`[MoveHistoryEditor] Error processing move ${move._id}:`, err);
-        }
-      }
-
-      console.log('[MoveHistoryEditor] AI identification complete:', processedCount, 'unknown moves processed');
-      alert(`AI identified ${processedCount} unknown moves. Review and confirm suggestions below.`);
-    } catch (err) {
-      console.error('[MoveHistoryEditor] Error in AI identification:', err);
-      alert('AI identification failed: ' + err.message);
-    } finally {
-      setAiProcessing(false);
-      setAiProgress({ current: 0, total: 0 });
-      setAiRetryStatus(''); // Clear retry status
-    }
-  };
-
-  const handleConfirmAiSuggestion = async (moveId) => {
-    const suggestion = aiSuggestions[moveId];
-    if (!suggestion) return;
-
-    await handlePlayerUpdate(moveId, suggestion.player);
   };
 
   const handleColorIdentifyAll = async () => {
@@ -478,7 +282,7 @@ function MoveHistoryEditor({ sessionGameId }) {
 
           setColorSuggestions((prev) => ({
             ...prev,
-            [move._id]: {
+            [getMoveId(move)]: {
               method: 'color',
               player:
                 result.suggestion === 'A'
@@ -493,7 +297,7 @@ function MoveHistoryEditor({ sessionGameId }) {
 
           processedCount += 1;
         } catch (err) {
-          console.error(`[MoveHistoryEditor] Color identify error for move ${move._id}:`, err);
+          console.error(`[MoveHistoryEditor] Color identify error for move ${getMoveId(move)}:`, err);
         }
       }
 
@@ -540,7 +344,7 @@ function MoveHistoryEditor({ sessionGameId }) {
 
           setColorSuggestions((prev) => ({
             ...prev,
-            [move._id]: {
+            [getMoveId(move)]: {
               method: 'color',
               player:
                 result.suggestion === 'A'
@@ -555,7 +359,7 @@ function MoveHistoryEditor({ sessionGameId }) {
 
           processedCount += 1;
         } catch (err) {
-          console.error(`[MoveHistoryEditor] Color identify error for move ${move._id}:`, err);
+          console.error(`[MoveHistoryEditor] Color identify error for move ${getMoveId(move)}:`, err);
         }
       }
 
@@ -591,7 +395,7 @@ function MoveHistoryEditor({ sessionGameId }) {
 
   const handleColorIdentifySingle = async (moveId) => {
     if (!session || !Array.isArray(session.moves)) return;
-    const move = session.moves.find((m) => m._id === moveId);
+    const move = session.moves.find((m) => getMoveId(m) === moveId);
     if (!move || !move.camera_frame) {
       alert('This move has no camera frame for color-based identification.');
       return;
@@ -668,7 +472,7 @@ function MoveHistoryEditor({ sessionGameId }) {
       const unknownMoveIds = new Set(
         session.moves
           .filter((move) => !move.player || move.player === 'Unknown' || move.player === 'None')
-          .map((move) => move._id)
+          .map((move) => getMoveId(move))
       );
 
       if (mode === 'unknown' && unknownMoveIds.size === 0) {
@@ -681,7 +485,7 @@ function MoveHistoryEditor({ sessionGameId }) {
 
       try {
         const framesPayload = movesWithFrames.map((move) => ({
-          moveId: move._id,
+          moveId: getMoveId(move),
           frameDataUrl: move.camera_frame,
           existingPlayer: move.player && move.player !== 'Unknown' ? move.player : null
         }));
@@ -776,7 +580,7 @@ function MoveHistoryEditor({ sessionGameId }) {
       const unknownMoveIds = new Set(
         session.moves
           .filter((move) => !move.player || move.player === 'Unknown' || move.player === 'None')
-          .map((move) => move._id)
+          .map((move) => getMoveId(move))
       );
 
       if (mode === 'unknown' && unknownMoveIds.size === 0) {
@@ -789,7 +593,7 @@ function MoveHistoryEditor({ sessionGameId }) {
 
       try {
         const framesPayload = movesWithFrames.map((move) => ({
-          moveId: move._id,
+          moveId: getMoveId(move),
           frameDataUrl: move.camera_frame,
           // Always pass existing player info to help the clustering algorithm
           // even if we only want suggestions for unknown moves later
@@ -903,31 +707,28 @@ function MoveHistoryEditor({ sessionGameId }) {
     });
   }, [allAllAnalytics]);
 
-  // Swap Player A and Player B in the DATABASE (persisted change)
+  // Swap Player A and Player B in the session file (persisted)
   const handleSwapPlayersABDatabase = useCallback(async () => {
-    if (!sessionGameId || !password || !session?.moves) return;
+    const root = dataRoot || getActiveDataRoot();
+    if (!sessionGameId || !root || !session?.moves) return;
 
     try {
-      // Prepare the swap operation
       const swapOperation = await swapPlayersAB({
+        rootHandle: root,
         sessionGameId,
-        password,
-        apiBaseUrl: API_BASE_URL,
         moves: session.moves,
         onProgress: (current, total) => {
           setSwapProgress({ current, total });
         }
       });
 
-      // Store pending operation and show modal
       setPendingSwapOperation(swapOperation);
       setShowSwapModal(true);
-
     } catch (err) {
       console.error('[MoveHistoryEditor] Swap preparation failed:', err);
       alert('Failed to prepare swap: ' + err.message);
     }
-  }, [sessionGameId, password, session?.moves]);
+  }, [sessionGameId, dataRoot, session?.moves]);
 
   // Handle swap confirmation from modal
   const handleConfirmSwap = useCallback(async () => {
@@ -947,7 +748,7 @@ function MoveHistoryEditor({ sessionGameId }) {
       setSession(prev => {
         if (!prev) return prev;
         const newMoves = prev.moves.map(move => {
-          const update = result.updates.find(u => u.moveId === move._id);
+          const update = result.updates.find(u => u.moveId === getMoveId(move));
           return update ? { ...move, player: update.player } : move;
         });
         return { ...prev, moves: newMoves };
@@ -970,53 +771,6 @@ function MoveHistoryEditor({ sessionGameId }) {
     setShowSwapModal(false);
     setPendingSwapOperation(null);
   }, []);
-
-  const handleAiIdentifySingle = async (moveId) => {
-    if (!sessionGameId || !password) return;
-
-    try {
-      console.log(`[MoveHistoryEditor] Identifying single move: ${moveId}`);
-
-      // Call API for single move
-      const response = await fetch(`${API_BASE_URL}/ai/identify-move`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-admin-password': password
-        },
-        body: JSON.stringify({
-          sessionGameId,
-          moveId,
-          colorA,
-          colorB,
-          cameraPosition: (colorAnchor === 'top' || colorAnchor === 'bottom') ? colorAnchor : undefined
-        })
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-
-        // Update suggestion for this move
-        setAiSuggestions(prev => ({
-          ...prev,
-          [moveId]: {
-            player: result.suggestion === 'A' ? 'Player A' :
-              result.suggestion === 'B' ? 'Player B' : 'None',
-            confidence: result.confidence,
-            rawResponse: result.rawResponse
-          }
-        }));
-
-        console.log(`[MoveHistoryEditor] ✅ Move identified: ${result.suggestion}`);
-      } else {
-        const error = await response.json();
-        alert(`Failed to identify move: ${error.message}`);
-      }
-    } catch (err) {
-      console.error(`[MoveHistoryEditor] Error identifying move:`, err);
-      alert('AI identification failed: ' + err.message);
-    }
-  };
 
   const filteredMoves = session?.moves?.filter(move => {
     let matchesPhase = true;
@@ -1041,8 +795,8 @@ function MoveHistoryEditor({ sessionGameId }) {
     if (analyticsSort === 'chronological') return moves;
 
     return moves.sort((a, b) => {
-      const hasSuggestionA = !!colorSuggestions[a._id];
-      const hasSuggestionB = !!colorSuggestions[b._id];
+      const hasSuggestionA = !!colorSuggestions[getMoveId(a)];
+      const hasSuggestionB = !!colorSuggestions[getMoveId(b)];
 
       // Always prioritize moves with suggestions
       if (hasSuggestionA && !hasSuggestionB) return -1;
@@ -1052,8 +806,8 @@ function MoveHistoryEditor({ sessionGameId }) {
       if (!hasSuggestionA && !hasSuggestionB) return 0;
 
       // Both have suggestions, sort by confidence
-      const confA = colorSuggestions[a._id]?.confidence || 0;
-      const confB = colorSuggestions[b._id]?.confidence || 0;
+      const confA = colorSuggestions[getMoveId(a)]?.confidence || 0;
+      const confB = colorSuggestions[getMoveId(b)]?.confidence || 0;
 
       if (analyticsSort === 'confidenceDesc') return confB - confA;
       if (analyticsSort === 'confidenceAsc') return confA - confB;
@@ -1064,11 +818,11 @@ function MoveHistoryEditor({ sessionGameId }) {
   const sortedMoves = getSortedMoves();
 
   const handleConfirmAllAboveThreshold = async () => {
-    if (!sessionGameId || !password) return;
+    const root = dataRoot || getActiveDataRoot();
+    if (!sessionGameId || !root) return;
 
     const movesToConfirm = Object.entries(colorSuggestions)
-      .filter(([moveId, suggestion]) => {
-        // Only confirm if confidence is above threshold
+      .filter(([, suggestion]) => {
         const confidencePercent = (suggestion.confidence || 0) * 100;
         return confidencePercent >= confirmThreshold;
       })
@@ -1082,7 +836,11 @@ function MoveHistoryEditor({ sessionGameId }) {
       return;
     }
 
-    if (!window.confirm(`Are you sure you want to confirm ${movesToConfirm.length} moves with confidence >= ${confirmThreshold}%?`)) {
+    if (
+      !window.confirm(
+        `Are you sure you want to confirm ${movesToConfirm.length} moves with confidence >= ${confirmThreshold}%?`
+      )
+    ) {
       return;
     }
 
@@ -1090,38 +848,18 @@ function MoveHistoryEditor({ sessionGameId }) {
     setConfirmProgress({ current: 0, total: movesToConfirm.length });
 
     try {
-      // Use new bulk update endpoint
-      const response = await fetch(
-        `${API_BASE_URL}/sessions/${encodeURIComponent(sessionGameId)}/moves/update-players-batch`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-admin-password': password
-          },
-          body: JSON.stringify({ updates: movesToConfirm })
-        }
-      );
+      await updateMovePlayersBatch(root, sessionGameId, movesToConfirm);
 
-      if (!response.ok) {
-        throw new Error(`Failed to update players (${response.status})`);
-      }
-
-      const result = await response.json();
-      console.log('[MoveHistoryEditor] Bulk update success:', result);
-
-      // Update local state
-      setSession(prev => {
+      setSession((prev) => {
         if (!prev) return prev;
-        const newMoves = prev.moves.map(move => {
-          const update = movesToConfirm.find(u => u.moveId === move._id);
+        const newMoves = prev.moves.map((move) => {
+          const update = movesToConfirm.find((u) => u.moveId === getMoveId(move));
           return update ? { ...move, player: update.player } : move;
         });
         return { ...prev, moves: newMoves };
       });
 
-      // Clear suggestions for updated moves
-      setColorSuggestions(prev => {
+      setColorSuggestions((prev) => {
         const updated = { ...prev };
         movesToConfirm.forEach(({ moveId }) => {
           delete updated[moveId];
@@ -1130,7 +868,6 @@ function MoveHistoryEditor({ sessionGameId }) {
       });
 
       alert(`Successfully confirmed ${movesToConfirm.length} moves.`);
-
     } catch (err) {
       console.error('Failed to confirm moves:', err);
       alert('Failed to confirm moves: ' + err.message);
@@ -1171,15 +908,15 @@ function MoveHistoryEditor({ sessionGameId }) {
     // Frames with low confidence suggestions
     const lowConfidenceFrames = movesWithFrames
       .filter(m => {
-        const suggestion = colorSuggestions[m._id];
+        const suggestion = colorSuggestions[getMoveId(m)];
         if (!suggestion) return false;
         const confidencePercent = (suggestion.confidence || 0) * 100;
         return confidencePercent < confirmThreshold;
       })
       .map(m => {
-        const suggestion = colorSuggestions[m._id];
+        const suggestion = colorSuggestions[getMoveId(m)];
         return {
-          id: m._id,
+          id: getMoveId(m),
           frameUrl: m.camera_frame,
           player: m.player || 'Unknown',
           time: m.elapsed,
@@ -1195,11 +932,11 @@ function MoveHistoryEditor({ sessionGameId }) {
     const lowConfidenceIds = new Set(lowConfidenceFrames.map(f => f.id));
     const unknownFrames = movesWithFrames
       .filter(m =>
-        !lowConfidenceIds.has(m._id) &&
+        !lowConfidenceIds.has(getMoveId(m)) &&
         (!m.player || m.player === 'Unknown' || m.player === 'None')
       )
       .map(m => ({
-        id: m._id,
+        id: getMoveId(m),
         frameUrl: m.camera_frame,
         player: m.player || 'Unknown',
         time: m.elapsed,
@@ -1227,25 +964,15 @@ function MoveHistoryEditor({ sessionGameId }) {
 
     // Remove suggestions for frames that were labeled (not skipped)
     if (result?.labeledIds && result.labeledIds.length > 0) {
-      setColorSuggestions(prev => {
+      setColorSuggestions((prev) => {
         const updated = { ...prev };
-        result.labeledIds.forEach(id => {
-          delete updated[id];
-        });
-        return updated;
-      });
-
-      // Also remove AI suggestions if any
-      setAiSuggestions(prev => {
-        const updated = { ...prev };
-        result.labeledIds.forEach(id => {
+        result.labeledIds.forEach((id) => {
           delete updated[id];
         });
         return updated;
       });
     }
 
-    // Reload session to get updated player assignments
     loadSession();
   };
 
@@ -1477,7 +1204,7 @@ function MoveHistoryEditor({ sessionGameId }) {
                 const unknownIds = new Set(
                   (session?.moves || [])
                     .filter(m => m.camera_frame && (!m.player || m.player === 'Unknown' || m.player === 'None'))
-                    .map(m => m._id)
+                    .map(m => getMoveId(m))
                 );
                 const suggestionIds = new Set(
                   Object.entries(colorSuggestions)
@@ -1823,8 +1550,8 @@ function MoveHistoryEditor({ sessionGameId }) {
         <div className="moves-grid">
           {sortedMoves.map((move, index) => (
             <div
-              key={move._id || index}
-              className={`move-card ${selectedMove?._id === move._id ? 'selected' : ''}`}
+              key={getMoveId(move) || index}
+              className={`move-card ${getMoveId(selectedMove) === getMoveId(move) ? 'selected' : ''}`}
               onClick={() => setSelectedMove(move)}
             >
               <div className="move-card-header">
@@ -1838,8 +1565,8 @@ function MoveHistoryEditor({ sessionGameId }) {
                   onClick={(e) => {
                     e.stopPropagation();
                     setExpandedImage(
-                      showDebugView && clothDebugPreviews[move._id]
-                        ? clothDebugPreviews[move._id]
+                      showDebugView && clothDebugPreviews[getMoveId(move)]
+                        ? clothDebugPreviews[getMoveId(move)]
                         : move.camera_frame
                     );
                   }}
@@ -1847,14 +1574,14 @@ function MoveHistoryEditor({ sessionGameId }) {
                 >
                   <img
                     src={
-                      showDebugView && clothDebugPreviews[move._id]
-                        ? clothDebugPreviews[move._id]
+                      showDebugView && clothDebugPreviews[getMoveId(move)]
+                        ? clothDebugPreviews[getMoveId(move)]
                         : move.camera_frame
                     }
                     alt={`Move ${index + 1}`}
                   />
                   <div className="image-overlay">🔍 Click to enlarge</div>
-                  {showDebugView && clothDebugPreviews[move._id] && (
+                  {showDebugView && clothDebugPreviews[getMoveId(move)] && (
                     <div style={{
                       position: 'absolute',
                       top: '10px',
@@ -1878,39 +1605,8 @@ function MoveHistoryEditor({ sessionGameId }) {
                   <span className="value">{move.type}</span>
                 </div>
 
-                {/* AI Suggestion Banner */}
-                {aiSuggestions[move._id] && (() => {
-                  const suggestedPlayer = aiSuggestions[move._id].player;
-                  const isPlayerA = suggestedPlayer === 'A' || suggestedPlayer === 'Player A';
-                  const bannerColor = isPlayerA ? colorA : colorB;
-                  return (
-                    <div
-                      className="ai-suggestion-banner"
-                      style={{
-                        borderColor: bannerColor,
-                        outline: `2px solid ${hexToRgba(bannerColor, 0.25)}`,
-                        outlineOffset: '2px'
-                      }}
-                    >
-                      <div className="ai-suggestion-content">
-                        <span className="ai-icon">🤖</span>
-                        <span className="ai-text">AI suggests: <strong>{aiSuggestions[move._id].player}</strong></span>
-                      </div>
-                      <button
-                        className="ai-confirm-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleConfirmAiSuggestion(move._id);
-                        }}
-                      >
-                        ✓ Confirm
-                      </button>
-                    </div>
-                  );
-                })()}
-
-                {colorSuggestions[move._id] && (() => {
-                  const suggestion = colorSuggestions[move._id];
+                {colorSuggestions[getMoveId(move)] && (() => {
+                  const suggestion = colorSuggestions[getMoveId(move)];
                   const suggestedPlayer = suggestion.player;
                   const isPlayerA = suggestedPlayer === 'Player A';
                   const bannerColor = isPlayerA ? colorA : colorB;
@@ -1958,15 +1654,15 @@ function MoveHistoryEditor({ sessionGameId }) {
                       </div>
                       <button
                         className="ai-confirm-btn"
-                        disabled={confirmingMoveId === move._id}
+                        disabled={confirmingMoveId === getMoveId(move)}
                         onClick={async (e) => {
                           e.stopPropagation();
-                          setConfirmingMoveId(move._id);
-                          await handleConfirmColorSuggestion(move._id);
+                          setConfirmingMoveId(getMoveId(move));
+                          await handleConfirmColorSuggestion(getMoveId(move));
                           setConfirmingMoveId(null);
                         }}
                       >
-                        {confirmingMoveId === move._id ? '...' : '✓ Confirm'}
+                        {confirmingMoveId === getMoveId(move) ? '...' : '✓ Confirm'}
                       </button>
                     </div>
                   );
@@ -1985,7 +1681,7 @@ function MoveHistoryEditor({ sessionGameId }) {
                     <select
                       className={`player-select ${move.player?.toLowerCase().replace(' ', '-')}`}
                       value={move.player || 'Unknown'}
-                      onChange={(e) => handlePlayerUpdate(move._id, e.target.value)}
+                      onChange={(e) => handlePlayerUpdate(getMoveId(move), e.target.value)}
                       onClick={(e) => e.stopPropagation()}
                       style={{
                         flex: 1,
@@ -2000,28 +1696,16 @@ function MoveHistoryEditor({ sessionGameId }) {
                       <option value="Unknown">Unknown</option>
                     </select>
                     {move.camera_frame && (
-                      <>
-                        <button
-                          className="ai-single-btn"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleAiIdentifySingle(move._id);
-                          }}
-                          title="Identify this move with AI"
-                        >
-                          🤖
-                        </button>
-                        <button
-                          className="ai-single-btn color-single-btn"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleColorIdentifySingle(move._id);
-                          }}
-                          title="Identify this move by color"
-                        >
-                          🎨
-                        </button>
-                      </>
+                      <button
+                        className="ai-single-btn color-single-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleColorIdentifySingle(getMoveId(move));
+                        }}
+                        title="Identify this move by color"
+                      >
+                        🎨
+                      </button>
                     )}
                   </div>
                 </div>

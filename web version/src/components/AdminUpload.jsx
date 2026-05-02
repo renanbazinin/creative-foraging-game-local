@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { getApiBaseUrl } from '../config/api.config';
+import {
+  getActiveDataRoot,
+  restoreDataRootFromStorage,
+  pickDataDirectory,
+  setActiveDataRoot,
+  importSessionDocument,
+  isFileSystemAccessSupported
+} from '../services/localSessionStore';
 import './AdminUpload.css';
-
-const ADMIN_PASSWORD_KEY = 'adminPassword';
 
 function AdminUpload() {
   const [file, setFile] = useState(null);
@@ -10,16 +15,35 @@ function AdminUpload() {
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
   const [preview, setPreview] = useState(null);
-  const [password, setPassword] = useState('');
-  const [passwordError, setPasswordError] = useState(false);
+  const [dataRoot, setDataRoot] = useState(() => getActiveDataRoot());
 
-  // Load password from localStorage on mount
   useEffect(() => {
-    const savedPassword = localStorage.getItem(ADMIN_PASSWORD_KEY);
-    if (savedPassword) {
-      setPassword(savedPassword);
-    }
+    let cancelled = false;
+    (async () => {
+      const h = await restoreDataRootFromStorage();
+      if (!cancelled && h) setDataRoot(h);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  const handleConnectFolder = async () => {
+    if (!isFileSystemAccessSupported()) {
+      setError('Use Chrome or Edge on desktop to pick a data folder.');
+      return;
+    }
+    try {
+      const h = await pickDataDirectory();
+      setActiveDataRoot(h);
+      setDataRoot(h);
+      setError(null);
+    } catch (e) {
+      if (e.name !== 'AbortError') {
+        setError(e.message || 'Could not access folder');
+      }
+    }
+  };
 
   const handleFileSelect = (e) => {
     const selectedFile = e.target.files[0];
@@ -35,7 +59,6 @@ function AdminUpload() {
     setError(null);
     setMessage(null);
 
-    // Preview the file
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
@@ -63,6 +86,12 @@ function AdminUpload() {
       return;
     }
 
+    const root = dataRoot || getActiveDataRoot();
+    if (!root) {
+      setError('Choose your CFG data folder first (same folder used when starting a game).');
+      return;
+    }
+
     setUploading(true);
     setError(null);
     setMessage(null);
@@ -77,51 +106,22 @@ function AdminUpload() {
 
       const sessionData = JSON.parse(fileContent);
 
-      // Validate basic structure
       if (!sessionData.sessionGameId || !sessionData.subjectId) {
         throw new Error('Missing required fields: sessionGameId and subjectId are required');
       }
 
-      // Check password
-      if (!password) {
-        throw new Error('Admin password is required. Please enter it below.');
-      }
+      await importSessionDocument(root, sessionData);
 
-      // Send to server
-      const response = await fetch(`${getApiBaseUrl()}/admin/upload`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-admin-password': password
-        },
-        body: JSON.stringify(sessionData)
-      });
-
-      const result = await response.json();
-
-      if (response.status === 401 || response.status === 403) {
-        setPasswordError(true);
-        throw new Error(result.message || 'Invalid admin password');
-      }
-
-      if (!response.ok) {
-        throw new Error(result.message || 'Upload failed');
-      }
-
-      // Save password on successful upload
-      localStorage.setItem(ADMIN_PASSWORD_KEY, password);
-      setPasswordError(false);
-
-      setMessage(`✅ Successfully uploaded session "${sessionData.sessionGameId}" with ${sessionData.moves?.length || 0} moves`);
+      setMessage(
+        `Saved session "${sessionData.sessionGameId}" with ${sessionData.moves?.length || 0} moves into your data folder.`
+      );
       setFile(null);
       setPreview(null);
-      
-      // Reset file input
+
       const fileInput = document.getElementById('json-file-input');
       if (fileInput) fileInput.value = '';
-
     } catch (err) {
-      setError(err.message || 'Failed to upload file');
+      setError(err.message || 'Failed to import file');
     } finally {
       setUploading(false);
     }
@@ -130,27 +130,19 @@ function AdminUpload() {
   return (
     <div className="admin-upload-container">
       <div className="admin-upload-card">
-        <h1>Admin: Upload Session JSON</h1>
+        <h1>Import session JSON</h1>
         <p className="admin-upload-description">
-          Upload a session JSON file to the server. The file will be validated to ensure it matches the expected format.
+          Imports into <code>sessions/&lt;session-id&gt;/session.json</code> and writes the matching{' '}
+          <code>session.csv</code>. Choose the same data folder you use when saving games.
         </p>
 
         <div className="admin-upload-form">
           <div className="password-input-wrapper">
-            <label htmlFor="admin-password">Admin Password:</label>
-            <input
-              id="admin-password"
-              type="password"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                setPasswordError(false);
-              }}
-              placeholder="Enter admin password"
-              className={passwordError ? 'error' : ''}
-            />
-            {passwordError && (
-              <span className="password-error-hint">Invalid password</span>
+            <button type="button" className="upload-button" onClick={handleConnectFolder} style={{ marginBottom: 12 }}>
+              {dataRoot ? 'Change data folder' : 'Choose data folder'}
+            </button>
+            {!dataRoot && (
+              <p style={{ color: '#f44336', fontSize: 14 }}>Connect a folder before importing.</p>
             )}
           </div>
 
@@ -202,18 +194,14 @@ function AdminUpload() {
             </div>
           )}
 
-          {message && (
-            <div className="success-message">
-              {message}
-            </div>
-          )}
+          {message && <div className="success-message">{message}</div>}
 
           <button
             className="upload-button"
             onClick={handleUpload}
-            disabled={!file || !password || uploading}
+            disabled={!file || !dataRoot || uploading}
           >
-            {uploading ? 'Uploading...' : 'Upload to Server'}
+            {uploading ? 'Saving…' : 'Save into data folder'}
           </button>
         </div>
       </div>
@@ -222,4 +210,3 @@ function AdminUpload() {
 }
 
 export default AdminUpload;
-

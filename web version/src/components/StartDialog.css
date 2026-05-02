@@ -20,6 +20,10 @@
   box-shadow: 0 4px 20px rgba(255, 255, 255, 0.3);
 }
 
+.dialog-box--wide {
+  max-width: 520px;
+}
+
 .dialog-header {
   display: flex;
   justify-content: space-between;
@@ -35,7 +39,82 @@
   flex: 1;
 }
 
-/* Server Health Indicator */
+/* Local-only badge */
+.local-data-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  background-color: #e8f5e9;
+  border: 2px solid #a5d6a7;
+}
+
+.local-data-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #2e7d32;
+  box-shadow: 0 0 6px rgba(46, 125, 50, 0.5);
+}
+
+.local-data-text {
+  color: #1b5e20;
+  font-weight: 600;
+}
+
+.folder-notice {
+  font-size: 14px;
+  line-height: 1.45;
+  color: #333;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+}
+
+.folder-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.dialog-button.folder-connect {
+  background-color: #1976d2;
+  color: #fff;
+  padding: 10px 20px;
+}
+
+.dialog-button.folder-connect:hover:not(:disabled) {
+  background-color: #1565c0;
+}
+
+.folder-status {
+  font-size: 14px;
+  color: #555;
+}
+
+.folder-status--ok {
+  color: #2e7d32;
+  font-weight: 600;
+}
+
+.folder-status--warn {
+  color: #c62828;
+}
+
+.folder-error {
+  color: #b71c1c;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+/* Server Health Indicator (legacy class names — unused) */
 .server-health-indicator {
   display: flex;
   align-items: center;

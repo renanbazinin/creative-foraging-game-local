@@ -37,11 +37,13 @@
   color: #4caf50;
 }
 
-.admin-password-row {
+.admin-password-row,
+.admin-folder-row {
   display: flex;
   align-items: center;
   gap: 8px;
   width: 100%;
+  flex-wrap: wrap;
 }
 
 .admin-password-input {

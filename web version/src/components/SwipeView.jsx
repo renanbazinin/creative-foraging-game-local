@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { getApiBaseUrl } from '../config/api.config';
+import {
+  getActiveDataRoot,
+  restoreDataRootFromStorage,
+  getSessionByGameId,
+  updateMovePlayersBatch,
+  getMoveId
+} from '../services/localSessionStore';
 import './SwipeView.css';
-
-const API_BASE_URL = getApiBaseUrl();
-const ADMIN_PASSWORD_KEY = 'adminPassword';
 
 // Helper function to convert HSV calibration to Hex color
 const hsvToHex = (calib) => {
@@ -50,7 +53,7 @@ function SwipeView({ sessionGameId, onClose, initialFrames = [], clusterColors =
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [password, setPassword] = useState('');
+  const [dataRoot, setDataRoot] = useState(() => getActiveDataRoot());
   const [swipeDirection, setSwipeDirection] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -74,13 +77,18 @@ function SwipeView({ sessionGameId, onClose, initialFrames = [], clusterColors =
     return '#9E9E9E'; // Gray for none
   };
 
-  // Load password and calibration colors from localStorage
   useEffect(() => {
-    const savedPassword = localStorage.getItem(ADMIN_PASSWORD_KEY);
-    if (savedPassword) {
-      setPassword(savedPassword);
-    }
+    let cancelled = false;
+    (async () => {
+      const h = await restoreDataRootFromStorage();
+      if (!cancelled && h) setDataRoot(h);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
+  useEffect(() => {
     // Load calibration colors from localStorage (bracelet detector)
     try {
       const calibA = JSON.parse(localStorage.getItem('calibrationA') || 'null');
@@ -116,39 +124,35 @@ function SwipeView({ sessionGameId, onClose, initialFrames = [], clusterColors =
         skipped: 0 
       });
       setLoading(false);
-    } else if (sessionGameId && password) {
+    } else if (sessionGameId && (dataRoot || getActiveDataRoot())) {
       loadSession();
     }
-  }, [sessionGameId, password, initialFrames]);
+  }, [sessionGameId, dataRoot, initialFrames]);
 
   const loadSession = async () => {
-    if (!password) return;
+    const root = dataRoot || getActiveDataRoot();
+    if (!root) {
+      setError('No data folder connected.');
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/sessions/${encodeURIComponent(sessionGameId)}`, {
-        headers: {
-          'x-admin-password': password
-        }
-      });
-      if (!response.ok) {
-        throw new Error(`Failed to load session (${response.status})`);
-      }
-      const data = await response.json();
-      
-      // Filter to frames that need review - prioritize unconfirmed suggestions and unknowns
+      const data = await getSessionByGameId(root, sessionGameId);
+
       const movesWithFrames = (data.moves || []).filter(m => m.camera_frame);
       const unknownMoves = movesWithFrames.filter(m => 
         !m.player || m.player === 'Unknown' || m.player === 'None'
       );
       
       const framesToReview = unknownMoves.map(m => ({
-        id: m._id,
+        id: getMoveId(m),
         frameUrl: m.camera_frame,
         player: m.player || 'Unknown',
         time: m.elapsed,
-        confidence: null, // Will be populated if available
+        confidence: null,
         type: m.type,
         phase: m.phase
       }));
@@ -168,25 +172,22 @@ function SwipeView({ sessionGameId, onClose, initialFrames = [], clusterColors =
   };
 
   const handlePlayerUpdate = useCallback(async (moveId, newPlayer, frameIndex) => {
-    if (!sessionGameId || !moveId || !password) {
-      console.error('[SwipeView] ❌ Missing required data for update:', { sessionGameId, moveId, hasPassword: !!password });
+    if (!sessionGameId || !moveId) {
+      console.error('[SwipeView] Missing sessionGameId or moveId');
       return false;
     }
-    
-    // Don't make API call - just store the decision locally
-    console.log(`[SwipeView] 📝 Frame #${frameIndex + 1} queued: ${moveId} → ${newPlayer}`);
+    console.log(`[SwipeView] Frame #${frameIndex + 1} queued: ${moveId} → ${newPlayer}`);
     return true;
-  }, [sessionGameId, password]);
+  }, [sessionGameId]);
 
-  // Batch save all decisions to server
   const saveAllDecisions = useCallback(async () => {
     if (decisions.length === 0) {
-      console.log('[SwipeView] No decisions to save');
       return true;
     }
 
-    if (!sessionGameId || !password) {
-      console.error('[SwipeView] ❌ Missing sessionGameId or password');
+    const root = dataRoot || getActiveDataRoot();
+    if (!sessionGameId || !root) {
+      console.error('[SwipeView] Missing session or data folder');
       return false;
     }
 
@@ -194,37 +195,17 @@ function SwipeView({ sessionGameId, onClose, initialFrames = [], clusterColors =
     setSaveError(null);
 
     try {
-      console.log(`[SwipeView] 💾 Saving ${decisions.length} decisions in batch...`);
-      
-      const response = await fetch(
-        `${API_BASE_URL}/sessions/${encodeURIComponent(sessionGameId)}/moves/update-players-batch`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-admin-password': password
-          },
-          body: JSON.stringify({ 
-            updates: decisions.map(d => ({ moveId: d.moveId, player: d.player }))
-          })
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to save (${response.status})`);
-      }
-
-      const result = await response.json();
-      console.log(`[SwipeView] ✅ Batch save successful:`, result);
+      const updates = decisions.map((d) => ({ moveId: d.moveId, player: d.player }));
+      await updateMovePlayersBatch(root, sessionGameId, updates);
       return true;
     } catch (err) {
-      console.error('[SwipeView] ❌ Batch save FAILED:', err.message);
+      console.error('[SwipeView] Batch save failed:', err.message);
       setSaveError(err.message);
       return false;
     } finally {
       setSaving(false);
     }
-  }, [decisions, sessionGameId, password]);
+  }, [decisions, sessionGameId, dataRoot]);
 
   const handleSwipe = useCallback((direction) => {
     if (currentIndex >= frames.length) return;

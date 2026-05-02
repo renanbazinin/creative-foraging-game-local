@@ -15,7 +15,7 @@ import Admin from './components/Admin';
 import AdminUpload from './components/AdminUpload';
 import MoveHistoryEditor from './components/MoveHistoryEditor';
 import SwipeView from './components/SwipeView';
-import { getGameTracker } from './utils/gameTracker';
+import { restoreDataRootFromStorage } from './services/localSessionStore';
 
 // ===== CONFIGURATION =====
 const ENABLE_DETECTOR = true; // Set to false to disable bracelet detector
@@ -28,6 +28,11 @@ function App() {
   const [detectorWindow, setDetectorWindow] = useState(null);
   const [currentRoute, setCurrentRoute] = useState(window.location.hash);
   const [interfaceHidden, setInterfaceHidden] = useState(false);
+
+  // Restore File System Access handle when returning to the app (e.g. Admin route)
+  useEffect(() => {
+    restoreDataRootFromStorage().catch(() => {});
+  }, []);
 
   // Listen for hash changes
   useEffect(() => {

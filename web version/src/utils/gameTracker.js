@@ -1,10 +1,14 @@
 /**
  * Game Tracker Utility
  * Tracks game moves with bracelet detection to determine which player made each move
- * Also handles server persistence
+ * Persists sessions and moves to the user-chosen local folder (File System Access API).
  */
 
-import { getApiBaseUrl } from '../config/api.config.js';
+import {
+  getActiveDataRoot,
+  upsertSession,
+  appendMove
+} from '../services/localSessionStore.js';
 
 const GRID_UNIT = 0.035; // Half-step of GRID_STEP (0.07) to represent the playable lattice
 
@@ -17,7 +21,6 @@ class GameTracker {
     this.trackingWindow = 1000; // 1 second window for lost tracking
     this.lastKnownPlayer = null; // Track last known player (A or B) for fallback
     this.sessionInfo = null;
-    this.apiBaseUrl = getApiBaseUrl();
     this.sessionInitialized = false;
     
     // Listen to bracelet detection status from localStorage or events
@@ -87,7 +90,7 @@ class GameTracker {
   }
 
   /**
-   * Set session info and initialize session on server
+   * Set session info and initialize session in local folder
    */
   async setSessionInfo(info = {}) {
     // Get calibration colors
@@ -102,7 +105,6 @@ class GameTracker {
     
     console.log('[GameTracker] Session info set with colors:', { colorA, colorB });
     
-    // Initialize session on server
     await this.initializeSession();
   }
 
@@ -158,16 +160,22 @@ class GameTracker {
   }
 
   /**
-   * Initialize session on server
+   * Initialize session file on disk
    */
   async initializeSession() {
     if (this.sessionInitialized || !this.sessionInfo?.sessionGameId) {
       return;
     }
 
-    // Get calibration colors
+    const root = getActiveDataRoot();
+    if (!root) {
+      const msg = 'No data folder is connected. Go back and choose a folder in the start dialog.';
+      console.error('[GameTracker]', msg);
+      throw new Error(msg);
+    }
+
     const { colorA, colorB } = this.getCalibrationColors();
-    
+
     const payload = {
       sessionGameId: this.sessionInfo.sessionGameId,
       subjectId: this.sessionInfo.id,
@@ -181,35 +189,19 @@ class GameTracker {
       }
     };
 
-    console.log('[GameTracker] Initializing session with colors:', { colorA, colorB });
+    console.log('[GameTracker] Initializing local session with colors:', { colorA, colorB });
 
     try {
-      const response = await fetch(`${this.apiBaseUrl}/sessions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.message || `Failed to initialize session (${response.status})`;
-        
-        if (response.status === 409) {
-          // Session ID conflict - show user-friendly alert
-          alert(`⚠️ Session ID Conflict\n\n${errorMessage}\n\nPlease choose a different Session ID.`);
-          // Prevent further tracking
-          this.stop();
-          throw new Error(errorMessage);
-        }
-        
-        throw new Error(errorMessage);
-      }
-      
+      await upsertSession(root, payload);
       this.sessionInitialized = true;
-      console.log('[GameTracker] Session initialized on server:', this.sessionInfo.sessionGameId);
+      console.log('[GameTracker] Session initialized locally:', this.sessionInfo.sessionGameId);
     } catch (error) {
+      if (error.status === 409) {
+        alert(
+          `⚠️ Session ID Conflict\n\n${error.message}\n\nPlease choose a different Session ID.`
+        );
+        this.stop();
+      }
       console.error('[GameTracker] Failed to initialize session:', error);
       throw error;
     }
@@ -278,7 +270,10 @@ class GameTracker {
         ? moveData.all_positions.map(pos => this.relativeToGrid(pos))
         : null);
     
+    const moveId = crypto.randomUUID();
+
     const move = {
+      moveId,
       timestamp,
       elapsed,
       player,
@@ -340,7 +335,7 @@ class GameTracker {
   }
 
   /**
-   * Persist a single move to the server
+   * Persist a single move to the local session file
    */
   async persistMove(move) {
     if (!this.sessionInitialized || !this.sessionInfo?.sessionGameId) {
@@ -348,29 +343,18 @@ class GameTracker {
       return;
     }
 
-    const url = `${this.apiBaseUrl}/sessions/${encodeURIComponent(this.sessionInfo.sessionGameId)}/moves`;
-    console.log(`[GameTracker] Persisting move to: ${url}`);
+    const root = getActiveDataRoot();
+    if (!root) {
+      console.error('[GameTracker] No data folder — cannot persist move');
+      return;
+    }
 
     try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(move)
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`[GameTracker] Server error (${response.status}):`, errorText);
-        throw new Error(`Failed to persist move (${response.status}): ${errorText}`);
-      }
-
-      const result = await response.json();
-      console.log('[GameTracker] ✅ Move persisted successfully:', result);
+      const result = await appendMove(root, this.sessionInfo.sessionGameId, move);
+      console.log('[GameTracker] Move persisted locally:', result?.moveId);
       return result;
     } catch (error) {
-      console.error('[GameTracker] ❌ persistMove error:', error);
+      console.error('[GameTracker] persistMove error:', error);
       throw error;
     }
   }

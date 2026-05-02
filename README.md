@@ -1,6 +1,6 @@
 ## 🌐 Live Demo
 
-Visit the [GitHub Pages deployment](https://renanbazinin.github.io/Creative-Foraging-Detection-Media-Pipe/) to try the web version.
+Visit the [GitHub Pages deployment](https://renanbazinin.github.io/creative-foraging-game-local/) to try the web version.
 
 
 # Creative Foraging Detection with MediaPipe
@@ -143,4 +143,4 @@ Research project developed for creative cognition studies.
 
 ## 🌐 Live Demo
 
-Visit the [GitHub Pages deployment](https://renanbazinin.github.io/Creative-Foraging-Detection-Media-Pipe/) to try the web version.
+Visit the [GitHub Pages deployment](https://renanbazinin.github.io/creative-foraging-game-local/) to try the web version.

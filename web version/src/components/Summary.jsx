@@ -7,6 +7,7 @@ import {
   updateCanMove,
   resetPositions
 } from '../utils/gameLogic';
+import { getMoveId } from '../services/localSessionStore';
 
 function Summary({
   initialData = null,
@@ -605,7 +606,7 @@ function Summary({
                           value={move.player || 'Unknown'}
                           onChange={(e) => {
                             const newPlayer = e.target.value;
-                            onPlayerUpdate(move._id, newPlayer);
+                            onPlayerUpdate(getMoveId(move), newPlayer);
                           }}
                           onClick={(e) => e.stopPropagation()}
                         >

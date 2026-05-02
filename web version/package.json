@@ -2,7 +2,11 @@
   "name": "creative-foraging-web",
   "version": "1.0.0",
   "type": "module",
-  "homepage": "https://renanbazinin.github.io/Creative-Foraging-Detection-Media-Pipe",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/renanbazinin/creative-foraging-game-local.git"
+  },
+  "homepage": "https://renanbazinin.github.io/creative-foraging-game-local",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

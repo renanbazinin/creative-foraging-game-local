@@ -1,9 +1,19 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Summary from './Summary';
-import { getApiBaseUrl } from '../config/api.config';
+import {
+  getActiveDataRoot,
+  restoreDataRootFromStorage,
+  pickDataDirectory,
+  setActiveDataRoot,
+  listSessionSummaries,
+  getSessionByGameId,
+  getSessionExperimentOnly,
+  updateMovePlayer,
+  getMoveId,
+  isFileSystemAccessSupported
+} from '../services/localSessionStore';
+import { sessionDocumentToMovesCsv } from '../utils/sessionCsv';
 import './Admin.css';
-
-const API_BASE_URL = getApiBaseUrl();
 
 const transformSessionToGameData = (session) => {
   if (!session) return null;
@@ -62,9 +72,8 @@ const formatDate = (value) => {
   return value;
 };
 
-const ADMIN_PASSWORD_KEY = 'adminPassword';
-
 function Admin() {
+  const [dataRoot, setDataRoot] = useState(() => getActiveDataRoot());
   const [sessions, setSessions] = useState([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [sessionsError, setSessionsError] = useState(null);
@@ -73,50 +82,51 @@ function Admin() {
   const [sessionLoading, setSessionLoading] = useState(false);
   const [sessionError, setSessionError] = useState(null);
   const [isExperimentOnly, setIsExperimentOnly] = useState(false);
-  const [password, setPassword] = useState('');
-  const [passwordError, setPasswordError] = useState(false);
 
-  // Load password from localStorage on mount
   useEffect(() => {
-    const savedPassword = localStorage.getItem(ADMIN_PASSWORD_KEY);
-    if (savedPassword) {
-      setPassword(savedPassword);
-    }
+    let cancelled = false;
+    (async () => {
+      const h = await restoreDataRootFromStorage();
+      if (!cancelled && h) {
+        setDataRoot(h);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
+  const handleConnectFolder = async () => {
+    if (!isFileSystemAccessSupported()) {
+      setSessionsError('Use Chrome or Edge on desktop to connect a data folder.');
+      return;
+    }
+    try {
+      const h = await pickDataDirectory();
+      setActiveDataRoot(h);
+      setDataRoot(h);
+      setSessionsError(null);
+    } catch (e) {
+      if (e.name !== 'AbortError') {
+        setSessionsError(e.message || 'Could not access folder');
+      }
+    }
+  };
+
   const fetchSessions = useCallback(async () => {
-    if (!password) {
-      setSessionsError('Password required');
+    const root = dataRoot || getActiveDataRoot();
+    if (!root) {
+      setSessionsError('Choose a data folder to load sessions.');
       setSessionsLoading(false);
+      setSessions([]);
       return;
     }
 
     setSessionsLoading(true);
     setSessionsError(null);
-    setPasswordError(false);
-    
+
     try {
-      const response = await fetch(`${API_BASE_URL}/sessions`, {
-        headers: {
-          'x-admin-password': password
-        }
-      });
-      
-      if (response.status === 401 || response.status === 403) {
-        setPasswordError(true);
-        throw new Error('Invalid password');
-      }
-      
-      if (!response.ok) {
-        throw new Error(`Failed to load sessions (${response.status})`);
-      }
-      
-      const data = await response.json();
-      const sessionList = Array.isArray(data) ? data : [];
-      
-      // Save password to localStorage on successful request
-      localStorage.setItem(ADMIN_PASSWORD_KEY, password);
-      
+      const sessionList = await listSessionSummaries(root);
       setSessions(sessionList);
       setSelectedSessionId((prev) => {
         if (prev && sessionList.some((session) => session.sessionGameId === prev)) {
@@ -125,21 +135,21 @@ function Admin() {
         return sessionList.length > 0 ? sessionList[0].sessionGameId : null;
       });
     } catch (error) {
-      console.error('[Admin] Error fetching sessions:', error);
+      console.error('[Admin] Error loading sessions:', error);
       setSessionsError(error.message || 'Failed to load sessions');
       setSessions([]);
       setSelectedSessionId(null);
     } finally {
       setSessionsLoading(false);
     }
-  }, [password]);
+  }, [dataRoot]);
 
   useEffect(() => {
     fetchSessions();
   }, [fetchSessions]);
 
   useEffect(() => {
-    if (!selectedSessionId) {
+    if (!selectedSessionId || !dataRoot) {
       setSessionData(null);
       return;
     }
@@ -147,28 +157,17 @@ function Admin() {
     let cancelled = false;
 
     const fetchSessionDetail = async () => {
-      if (!password) return;
-      
       setSessionLoading(true);
       setSessionError(null);
       try {
-        const response = await fetch(`${API_BASE_URL}/sessions/${encodeURIComponent(selectedSessionId)}`, {
-          headers: {
-            'x-admin-password': password
-          }
-        });
-        if (!response.ok) {
-          if (response.status === 404) {
-            throw new Error('Session not found');
-          }
-          throw new Error(`Failed to load session (${response.status})`);
-        }
-        const data = await response.json();
+        const data = isExperimentOnly
+          ? await getSessionExperimentOnly(dataRoot, selectedSessionId)
+          : await getSessionByGameId(dataRoot, selectedSessionId);
         if (!cancelled) {
           setSessionData(transformSessionToGameData(data));
         }
       } catch (error) {
-        console.error('[Admin] Error fetching session detail:', error);
+        console.error('[Admin] Error loading session detail:', error);
         if (!cancelled) {
           setSessionError(error.message || 'Failed to load session');
           setSessionData(null);
@@ -185,43 +184,15 @@ function Admin() {
     return () => {
       cancelled = true;
     };
-  }, [selectedSessionId]);
+  }, [selectedSessionId, dataRoot, isExperimentOnly]);
 
   const handleSelectSession = (sessionGameId) => {
     setSelectedSessionId(sessionGameId);
-    setIsExperimentOnly(false); // Reset to show all when selecting a new session
+    setIsExperimentOnly(false);
   };
 
-  const toggleExperimentOnly = async () => {
-    if (!selectedSessionId || !password) return;
-    
-    const newMode = !isExperimentOnly;
-    setIsExperimentOnly(newMode);
-    
-    setSessionLoading(true);
-    setSessionError(null);
-    try {
-      const endpoint = newMode 
-        ? `${API_BASE_URL}/sessions/${encodeURIComponent(selectedSessionId)}/experiment-only`
-        : `${API_BASE_URL}/sessions/${encodeURIComponent(selectedSessionId)}`;
-        
-      const response = await fetch(endpoint, {
-        headers: {
-          'x-admin-password': password
-        }
-      });
-      if (!response.ok) {
-        throw new Error(`Failed to load session data (${response.status})`);
-      }
-      const data = await response.json();
-      setSessionData(transformSessionToGameData(data));
-    } catch (error) {
-      console.error('[Admin] Error loading session data:', error);
-      setSessionError(error.message || 'Failed to load session data');
-      setIsExperimentOnly(!newMode); // Revert on error
-    } finally {
-      setSessionLoading(false);
-    }
+  const toggleExperimentOnly = () => {
+    setIsExperimentOnly((v) => !v);
   };
 
   const handleEditPlayers = () => {
@@ -232,7 +203,7 @@ function Admin() {
 
   const downloadJSON = () => {
     if (!sessionData) return;
-    
+
     const json = JSON.stringify(sessionData, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -251,35 +222,7 @@ function Admin() {
       return;
     }
 
-    // Get all unique keys from moves
-    const allKeys = new Set();
-    sessionData.moves.forEach(move => {
-      Object.keys(move).forEach(key => {
-        // Skip very large fields or internal MongoDB fields
-        if (key !== 'camera_frame' && key !== '__v') {
-          allKeys.add(key);
-        }
-      });
-    });
-
-    const headers = Array.from(allKeys);
-    const rows = [headers.join(',')];
-
-    sessionData.moves.forEach(move => {
-      const row = headers.map(key => {
-        const value = move[key];
-        if (value === null || value === undefined || value === '') {
-          return '';
-        }
-        if (Array.isArray(value) || typeof value === 'object') {
-          return `"${JSON.stringify(value).replace(/"/g, '""')}"`;
-        }
-        return `"${String(value).replace(/"/g, '""')}"`;
-      });
-      rows.push(row.join(','));
-    });
-
-    const csvContent = rows.join('\n');
+    const csvContent = sessionDocumentToMovesCsv(sessionData);
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -292,32 +235,17 @@ function Admin() {
   };
 
   const handlePlayerUpdate = async (moveId, newPlayer) => {
-    if (!selectedSessionId || !moveId || !password) return;
+    if (!selectedSessionId || !moveId || !dataRoot) return;
 
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/sessions/${encodeURIComponent(selectedSessionId)}/moves/${encodeURIComponent(moveId)}`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-admin-password': password
-          },
-          body: JSON.stringify({ player: newPlayer })
-        }
-      );
+      await updateMovePlayer(dataRoot, selectedSessionId, moveId, newPlayer);
 
-      if (!response.ok) {
-        throw new Error(`Failed to update player (${response.status})`);
-      }
-
-      // Update local state
-      setSessionData(prev => {
+      setSessionData((prev) => {
         if (!prev) return prev;
         return {
           ...prev,
-          moves: prev.moves.map(move =>
-            move._id === moveId ? { ...move, player: newPlayer } : move
+          moves: prev.moves.map((move) =>
+            getMoveId(move) === moveId ? { ...move, player: newPlayer } : move
           )
         };
       });
@@ -334,30 +262,35 @@ function Admin() {
       <aside className="admin-sidebar">
         <div className="admin-sidebar-header">
           <h1>Admin</h1>
-          <div className="admin-password-row">
-            <input
-              type="password"
-              className={`admin-password-input ${passwordError ? 'error' : ''}`}
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  fetchSessions();
-                }
-              }}
-            />
-            <button className="admin-refresh-button" onClick={fetchSessions} disabled={sessionsLoading || !password}>
+          <div className="admin-folder-row">
+            <button
+              type="button"
+              className="admin-refresh-button"
+              onClick={handleConnectFolder}
+              title="Choose the folder that contains your CFG session files"
+            >
+              {dataRoot ? 'Change folder' : 'Connect data folder'}
+            </button>
+            <button
+              className="admin-refresh-button"
+              onClick={fetchSessions}
+              disabled={sessionsLoading || !dataRoot}
+            >
               {sessionsLoading ? 'Refreshing…' : 'Refresh'}
             </button>
           </div>
         </div>
+        {!dataRoot && (
+          <div className="admin-error">
+            Connect the same folder you use for saving games (Chrome / Edge). The browser will ask for permission.
+          </div>
+        )}
         {sessionsError && <div className="admin-error">{sessionsError}</div>}
         <div className="admin-session-list">
           {sessionsLoading && sessions.length === 0 && (
             <div className="admin-status">Loading sessions…</div>
           )}
-          {!sessionsLoading && sessions.length === 0 && !sessionsError && (
+          {!sessionsLoading && sessions.length === 0 && !sessionsError && dataRoot && (
             <div className="admin-status">No sessions found.</div>
           )}
           {sessions.map((session) => {
@@ -399,21 +332,27 @@ function Admin() {
           <>
             <div className="admin-toolbar">
               <div className="admin-toolbar-group admin-toolbar-group--primary">
-                <button 
+                <button
                   className="admin-toolbar-button back-button"
-                  onClick={() => { window.location.hash = '/'; }}
+                  onClick={() => {
+                    window.location.hash = '/';
+                  }}
                   title="Return to start dialog"
                 >
                   ← Back
                 </button>
-                <button 
+                <button
                   className={`admin-toolbar-button experiment-toggle ${isExperimentOnly ? 'active' : ''}`}
                   onClick={toggleExperimentOnly}
-                  title={isExperimentOnly ? 'Show all moves (including practice)' : 'Show only experiment phase moves'}
+                  title={
+                    isExperimentOnly
+                      ? 'Show all moves (including practice)'
+                      : 'Show only experiment phase moves'
+                  }
                 >
                   {isExperimentOnly ? 'Show All Moves' : 'Experiment Only'}
                 </button>
-                <button 
+                <button
                   className="admin-toolbar-button edit-players"
                   onClick={handleEditPlayers}
                   title="Open dedicated editor for player assignments"
@@ -422,14 +361,14 @@ function Admin() {
                 </button>
               </div>
               <div className="admin-toolbar-group admin-toolbar-group--secondary">
-                <button 
+                <button
                   className="admin-toolbar-button download-json"
                   onClick={downloadJSON}
                   title="Download session data as JSON"
                 >
                   Download JSON
                 </button>
-                <button 
+                <button
                   className="admin-toolbar-button download-csv"
                   onClick={downloadCSV}
                   title="Download moves as CSV"
@@ -450,7 +389,7 @@ function Admin() {
             </div>
           </>
         )}
-        {!sessionLoading && !sessionError && !sessionData && (
+        {!sessionLoading && !sessionError && !sessionData && dataRoot && (
           <div className="admin-status admin-status--content">Select a session to view its moves.</div>
         )}
       </main>
@@ -459,4 +398,3 @@ function Admin() {
 }
 
 export default Admin;
-
