@@ -92,13 +92,19 @@ function StartDialog({ onStart }) {
   return (
     <div className="dialog-overlay">
       <div className="dialog-box dialog-box--wide">
-        <div className="dialog-header">
-          <h2>The Creative Foraging Game</h2>
-          <div className="local-data-badge" title="All session data stays on your device in the folder you choose.">
-            <span className="local-data-dot" />
-            <span className="local-data-text">Local only</span>
+        <header className="start-dialog-hero">
+          <h1 className="start-dialog-title">Creative Foraging Game</h1>
+          <p className="start-dialog-subtitle">Session setup — runs in your browser</p>
+          <div className="start-dialog-badge-row">
+            <div
+              className="local-data-badge start-dialog-local-badge"
+              title="All session data stays on your device in the folder you choose."
+            >
+              <span className="local-data-dot" aria-hidden />
+              <span className="local-data-text">Local only</span>
+            </div>
           </div>
-        </div>
+        </header>
 
         <div className="start-dialog-about">
           <button

@@ -30,20 +30,43 @@
   max-width: min(920px, calc(100vw - 32px));
 }
 
-.dialog-header {
+/* Start screen hero: title + subtitle stacked, badge below (not beside title) */
+.start-dialog-hero {
+  text-align: center;
+  margin-bottom: 22px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.start-dialog-title {
+  margin: 0;
+  font-size: clamp(1.5rem, 4.5vw, 1.85rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: #1a1a1a;
+}
+
+.start-dialog-subtitle {
+  margin: 8px 0 0;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #616161;
+  letter-spacing: 0.01em;
+}
+
+/* Full-width row centers the pill; badge stays shrink-to-content (no stretch) */
+.start-dialog-badge-row {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 25px;
-  gap: 20px;
-  flex-wrap: wrap;
+  justify-content: center;
+  width: 100%;
+  margin-top: 14px;
 }
 
 .dialog-box h2 {
   margin: 0;
   text-align: center;
   color: #333;
-  flex: 1;
 }
 
 /* Local-only badge */
@@ -58,6 +81,15 @@
   white-space: nowrap;
   background-color: #e8f5e9;
   border: 2px solid #a5d6a7;
+}
+
+/* Start dialog: pill stays compact + centered (must follow base .local-data-badge) */
+.local-data-badge.start-dialog-local-badge {
+  display: inline-flex;
+  width: auto;
+  max-width: max-content;
+  flex: 0 0 auto;
+  align-self: center;
 }
 
 .local-data-dot {
@@ -75,7 +107,7 @@
 
 .start-dialog-about {
   text-align: center;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 
 .start-dialog-about-link {
@@ -283,20 +315,13 @@
     padding: 22px 16px;
   }
 
-  .dialog-header {
-    flex-direction: column;
-    align-items: stretch;
-    text-align: center;
-    gap: 12px;
+  .start-dialog-hero {
+    margin-bottom: 18px;
+    padding-bottom: 16px;
   }
 
-  .dialog-box h2 {
-    font-size: 1.2rem;
-  }
-
-  .local-data-badge {
-    justify-content: center;
-    align-self: center;
+  .start-dialog-subtitle {
+    font-size: 0.88rem;
   }
 
   .dialog-buttons {
