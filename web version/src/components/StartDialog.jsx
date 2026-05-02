@@ -89,10 +89,6 @@ function StartDialog({ onStart }) {
     onStart(config);
   };
 
-  const handleCancel = () => {
-    window.close();
-  };
-
   return (
     <div className="dialog-overlay">
       <div className="dialog-box dialog-box--wide">
@@ -102,6 +98,18 @@ function StartDialog({ onStart }) {
             <span className="local-data-dot" />
             <span className="local-data-text">Local only</span>
           </div>
+        </div>
+
+        <div className="start-dialog-about">
+          <button
+            type="button"
+            className="start-dialog-about-link"
+            onClick={() => {
+              window.location.hash = '#/about';
+            }}
+          >
+            About &amp; Learn more
+          </button>
         </div>
 
         <div className="folder-notice">
@@ -168,9 +176,6 @@ function StartDialog({ onStart }) {
           </button>
           <button className="dialog-button ok" onClick={handleOK} disabled={!folderReady}>
             OK
-          </button>
-          <button className="dialog-button cancel" onClick={handleCancel}>
-            Cancel
           </button>
         </div>
       </div>

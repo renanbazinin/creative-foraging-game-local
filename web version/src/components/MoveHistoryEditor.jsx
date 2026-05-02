@@ -665,7 +665,7 @@ function MoveHistoryEditor({ sessionGameId }) {
         setAllAllProcessing(false);
       }
     },
-    [session, colorAnchor, manualScanBounds]
+    [session, colorAnchor, manualScanBounds, backgroundSensitivity, colorA, colorB]
   );
 
   const handleAllAllIdentifyAll = useCallback(() => {
@@ -1180,6 +1180,42 @@ function MoveHistoryEditor({ sessionGameId }) {
               disabled={allAllProcessing}
             >
               {allAllProcessing ? '🌐 Identifying by All All...' : '🌐 Identify by All Unknown'}
+            </button>
+            <button
+              type="button"
+              className="ai-btn"
+              onClick={handleClothIdentifyAll}
+              disabled={clothProcessing || allAllProcessing || colorProcessing}
+              title="Cloth-class segmentation: suggest players for all moves with frames"
+            >
+              {clothProcessing ? '👕 Cloth…' : '👕 Cloth (all)'}
+            </button>
+            <button
+              type="button"
+              className="ai-btn"
+              onClick={handleClothIdentifyUnknown}
+              disabled={clothProcessing || allAllProcessing || colorProcessing}
+              title="Cloth-class segmentation: unknown / none moves only"
+            >
+              {clothProcessing ? '👕 Cloth…' : '👕 Cloth (unknown)'}
+            </button>
+            <button
+              type="button"
+              className="ai-btn"
+              onClick={handleColorIdentifyAll}
+              disabled={colorProcessing || allAllProcessing || clothProcessing}
+              title="Segmentation + bracelet colors: all filtered moves with frames"
+            >
+              {colorProcessing ? '🎨 Color…' : '🎨 Color (all)'}
+            </button>
+            <button
+              type="button"
+              className="ai-btn"
+              onClick={handleColorIdentifyUnknown}
+              disabled={colorProcessing || allAllProcessing || clothProcessing}
+              title="Segmentation + bracelet colors: unknown moves only"
+            >
+              {colorProcessing ? '🎨 Color…' : '🎨 Color (unknown)'}
             </button>
             <button
               onClick={handleOpenSwipeView}
