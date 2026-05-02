@@ -4,7 +4,8 @@
  * Legacy: <chosen-dir>/sessions/<sanitizedSessionId>.json (read + migrate on write)
  */
 
-import { sessionDocumentToMovesCsv } from '../utils/sessionCsv.js';
+import { sessionDocumentToMovesCsv, legacyMovesCsvToSessionDocument } from '../utils/sessionCsv.js';
+import { normalizeSessionDocument, flatSessionForStorage } from '../utils/sessionNormalize.js';
 
 const IDB_NAME = 'cfg-local-session-store';
 const IDB_STORE = 'handles';
@@ -175,6 +176,74 @@ async function readJsonFromFileHandle(fileHandle) {
   }
 }
 
+/** Every read path returns a flat session doc when the file is legacy export JSON or flat local JSON. */
+function finalizeSessionRead(data) {
+  if (!data) return null;
+  const flat = flatSessionForStorage(data);
+  if (flat) return flat;
+  return normalizeSessionDocument(data) || data;
+}
+
+async function groupExportFilesByStem(dirHandle) {
+  const map = new Map();
+  for await (const ent of dirHandle.values()) {
+    if (ent.kind !== 'file') continue;
+    const name = ent.name;
+    if (!name.endsWith('.json') && !name.endsWith('.csv')) continue;
+    const stem = name.replace(/\.(json|csv)$/i, '');
+    if (!map.has(stem)) map.set(stem, {});
+    const rec = map.get(stem);
+    if (name.toLowerCase().endsWith('.json')) rec.json = name;
+    else rec.csv = name;
+  }
+  return map;
+}
+
+/**
+ * Manual legacy exports: any subfolder of sessions/ (e.g. sessions/exported/) with
+ * paired <stem>.json + <stem>.csv — JSON is preferred when both exist.
+ */
+async function readSessionFromLooseExports(sessionsDir, sessionGameId) {
+  const target = String(sessionGameId);
+  for await (const entry of sessionsDir.values()) {
+    if (entry.kind !== 'directory') continue;
+
+    let stemMap;
+    try {
+      stemMap = await groupExportFilesByStem(entry);
+    } catch {
+      continue;
+    }
+
+    for (const [, pair] of stemMap) {
+      let raw = null;
+      if (pair.json) {
+        try {
+          const fh = await entry.getFileHandle(pair.json);
+          raw = await readJsonFromFileHandle(fh);
+        } catch {
+          /* empty */
+        }
+      }
+      const norm = raw ? normalizeSessionDocument(raw) : null;
+      if ((!norm || !norm.sessionGameId) && pair.csv) {
+        try {
+          const fh = await entry.getFileHandle(pair.csv);
+          const text = await (await fh.getFile()).text();
+          raw = legacyMovesCsvToSessionDocument(text);
+        } catch {
+          /* empty */
+        }
+      }
+      const flat = raw ? flatSessionForStorage(raw) : null;
+      if (flat && String(flat.sessionGameId) === target) {
+        return flat;
+      }
+    }
+  }
+  return null;
+}
+
 async function readSessionFile(rootHandle, sessionGameId) {
   const sessionsDir = await getSessionsDirectory(rootHandle);
   const safe = sanitizedExperimentFolderName(sessionGameId);
@@ -184,7 +253,7 @@ async function readSessionFile(rootHandle, sessionGameId) {
     try {
       const fh = await expDir.getFileHandle(SESSION_JSON);
       const data = await readJsonFromFileHandle(fh);
-      if (data) return data;
+      if (data) return finalizeSessionRead(data);
     } catch {
       /* empty */
     }
@@ -194,18 +263,27 @@ async function readSessionFile(rootHandle, sessionGameId) {
 
   try {
     const fh = await sessionsDir.getFileHandle(legacyFlatSessionFileName(sessionGameId));
-    return readJsonFromFileHandle(fh);
+    const legacy = await readJsonFromFileHandle(fh);
+    if (legacy) return finalizeSessionRead(legacy);
   } catch {
-    return null;
+    /* empty */
   }
+
+  const loose = await readSessionFromLooseExports(sessionsDir, sessionGameId);
+  if (loose) return loose;
+
+  return null;
 }
 
 /**
  * Write a full session document (e.g. import from JSON file).
  */
 export async function importSessionDocument(rootHandle, sessionData) {
-  if (!sessionData?.sessionGameId || !sessionData?.subjectId) {
-    const err = new Error('sessionGameId and subjectId are required');
+  const flat = flatSessionForStorage(sessionData);
+  if (!flat?.sessionGameId || !flat?.subjectId) {
+    const err = new Error(
+      'sessionGameId and subjectId are required (use flat JSON or legacy export with sessionInfo)'
+    );
     err.status = 400;
     throw err;
   }
@@ -213,11 +291,11 @@ export async function importSessionDocument(rootHandle, sessionData) {
     throw new Error('Permission denied for data folder');
   }
   const doc = {
-    ...sessionData,
-    createdAt: sessionData.createdAt || nowIso(),
+    ...flat,
+    createdAt: flat.createdAt || nowIso(),
     updatedAt: nowIso()
   };
-  await writeExperimentFiles(rootHandle, sessionData.sessionGameId, doc);
+  await writeExperimentFiles(rootHandle, flat.sessionGameId, doc);
   return doc;
 }
 
@@ -230,15 +308,57 @@ export function getMoveId(move) {
 }
 
 function summarizeSessionJson(data) {
-  const moves = Array.isArray(data.moves) ? data.moves : [];
+  const n = normalizeSessionDocument(data) || data;
+  if (!n) {
+    return {};
+  }
+  const moves = Array.isArray(n.moves) ? n.moves : [];
   return {
-    sessionGameId: data.sessionGameId,
-    subjectId: data.subjectId,
-    condition: data.condition,
-    createdAt: data.createdAt,
-    updatedAt: data.updatedAt,
+    sessionGameId: n.sessionGameId,
+    subjectId: n.subjectId,
+    condition: n.condition,
+    createdAt: n.createdAt,
+    updatedAt: n.updatedAt,
     movesCount: moves.length
   };
+}
+
+async function collectLooseExportsFromDirectory(subdirHandle, sessionsDir, seenIds, out) {
+  let stemMap;
+  try {
+    stemMap = await groupExportFilesByStem(subdirHandle);
+  } catch {
+    return;
+  }
+
+  for (const [, pair] of stemMap) {
+    let data = null;
+    if (pair.json) {
+      try {
+        const fh = await subdirHandle.getFileHandle(pair.json);
+        data = await readJsonFromFileHandle(fh);
+      } catch {
+        /* empty */
+      }
+    }
+    if ((!data || !summarizeSessionJson(data).sessionGameId) && pair.csv) {
+      try {
+        const fh = await subdirHandle.getFileHandle(pair.csv);
+        const text = await (await fh.getFile()).text();
+        data = legacyMovesCsvToSessionDocument(text);
+      } catch {
+        /* empty */
+      }
+    }
+    const summary = summarizeSessionJson(data);
+    if (!summary.sessionGameId || seenIds.has(summary.sessionGameId)) continue;
+    const folderName = sanitizedExperimentFolderName(summary.sessionGameId);
+    const hasCanon = await experimentFolderExists(sessionsDir, folderName);
+    if (!hasCanon) {
+      seenIds.add(summary.sessionGameId);
+      out.push(summary);
+    }
+  }
 }
 
 /**
@@ -254,6 +374,7 @@ export async function listSessionSummaries(rootHandle) {
 
   for await (const entry of dir.values()) {
     if (entry.kind === 'directory') {
+      let added = false;
       try {
         const fh = await entry.getFileHandle(SESSION_JSON);
         const file = await fh.getFile();
@@ -262,15 +383,21 @@ export async function listSessionSummaries(rootHandle) {
         try {
           data = JSON.parse(text);
         } catch {
-          continue;
+          data = null;
         }
-        const summary = summarizeSessionJson(data);
-        if (summary.sessionGameId) {
-          seenIds.add(summary.sessionGameId);
-          out.push(summary);
+        if (data) {
+          const summary = summarizeSessionJson(data);
+          if (summary.sessionGameId) {
+            seenIds.add(summary.sessionGameId);
+            out.push(summary);
+            added = true;
+          }
         }
       } catch {
         /* no session.json */
+      }
+      if (!added) {
+        await collectLooseExportsFromDirectory(entry, dir, seenIds, out);
       }
     } else if (entry.kind === 'file' && entry.name.endsWith('.json')) {
       const file = await entry.getFile();

@@ -7,6 +7,7 @@ import {
   importSessionDocument,
   isFileSystemAccessSupported
 } from '../services/localSessionStore';
+import { flatSessionForStorage } from '../utils/sessionNormalize';
 import './AdminUpload.css';
 
 function AdminUpload() {
@@ -63,14 +64,17 @@ function AdminUpload() {
     reader.onload = (event) => {
       try {
         const data = JSON.parse(event.target.result);
+        const flat = flatSessionForStorage(data);
+        const src = flat || data;
+        const si = data.sessionInfo;
         setPreview({
-          sessionGameId: data.sessionGameId || 'N/A',
-          subjectId: data.subjectId || 'N/A',
-          condition: data.condition || 'N/A',
-          date: data.date || 'N/A',
-          movesCount: data.moves?.length || 0,
-          hasColorA: !!data.colorA,
-          hasColorB: !!data.colorB
+          sessionGameId: src.sessionGameId || si?.sessionGameId || 'N/A',
+          subjectId: src.subjectId || si?.subjectId || 'N/A',
+          condition: src.condition || si?.condition || 'N/A',
+          date: src.date || si?.date || 'N/A',
+          movesCount: src.moves?.length || data.moves?.length || 0,
+          hasColorA: !!(src.colorA || si?.colorA),
+          hasColorB: !!(src.colorB || si?.colorB)
         });
       } catch (err) {
         setError('Invalid JSON file: ' + err.message);
@@ -105,15 +109,17 @@ function AdminUpload() {
       });
 
       const sessionData = JSON.parse(fileContent);
-
-      if (!sessionData.sessionGameId || !sessionData.subjectId) {
-        throw new Error('Missing required fields: sessionGameId and subjectId are required');
+      const flat = flatSessionForStorage(sessionData);
+      if (!flat?.sessionGameId || !flat?.subjectId) {
+        throw new Error(
+          'Missing required fields: sessionGameId and subjectId (accepts flat session or legacy export JSON with sessionInfo)'
+        );
       }
 
       await importSessionDocument(root, sessionData);
 
       setMessage(
-        `Saved session "${sessionData.sessionGameId}" with ${sessionData.moves?.length || 0} moves into your data folder.`
+        `Saved session "${flat.sessionGameId}" with ${flat.moves?.length || 0} moves into your data folder.`
       );
       setFile(null);
       setPreview(null);

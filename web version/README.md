@@ -42,6 +42,18 @@ npm run preview
 
 Camera, MediaPipe, and folder access work best over **HTTPS** or **localhost** (not `file://`).
 
+## Legacy project export (CSV / JSON)
+
+This means the **files produced by the old project** (server + Admin download), not a raw dump from a database tool. Field names like `_id` on moves come from that pipeline.
+
+**Downloads (Admin):** CSV columns follow the same stable ordering as those legacy exports (see `LEGACY_EXPORT_CSV_COLUMNS` in `src/utils/sessionCsv.js`). The `_id` column is filled from `moveId` or `_id` on each move. JSON download uses the same `transformSessionToGameData` envelope as the pre–local-storage Admin (`startTime`, `endTime`, `sessionInfo`, `moves`, `summary`, …).
+
+**Manual import (you place files):** Under `sessions/`, any subfolder that does **not** use the normal `session.json` layout can hold **paired** files with the same base name, e.g. `sessions/exported/322…_2026-05-02.json` and `322…_2026-05-02.csv`. If both exist, the app loads the **JSON** (legacy envelope with `sessionInfo` is normalized automatically); CSV is fallback if JSON is missing or invalid. Those sessions appear in Admin after you connect the data folder. To import into the canonical folder layout, open the session in Admin or use **Import session JSON**; the app flattens and writes `sessions/<id>/session.json` + `session.csv`.
+
+## Progressive Web App (PWA)
+
+The build includes a [Web App Manifest](https://developer.mozilla.org/en-US/docs/Web/Manifest) and a service worker via [`vite-plugin-pwa`](https://vite-pwa-org.netlify.app/). On a supported browser, you can **install** the app from the address bar or app menu. Install and service workers require a **secure context** (HTTPS, including GitHub Pages, or `http://localhost` for development). The File System Access API and camera still need that same secure context; installing the PWA does not change those requirements. Large MediaPipe model files are not fully precached on install, so the first run may need a network; offline behavior may be partial until runtime caches are populated.
+
 ## Configuration
 
 ### Enable/Disable Bracelet Detector
