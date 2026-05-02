@@ -15,6 +15,7 @@ import Admin from './components/Admin';
 import AdminUpload from './components/AdminUpload';
 import MoveHistoryEditor from './components/MoveHistoryEditor';
 import SwipeView from './components/SwipeView';
+import About from './components/About';
 import { restoreDataRootFromStorage } from './services/localSessionStore';
 
 // ===== CONFIGURATION =====
@@ -142,6 +143,8 @@ function App() {
     body = <Admin />;
   } else if (currentRoute === '#/admin/upload') {
     body = <AdminUpload />;
+  } else if (currentRoute === '#/about') {
+    body = <About />;
   } else if (swipeViewMatch) {
     // SwipeView with session ID from route
     const sessionGameId = decodeURIComponent(swipeViewMatch[1]);
