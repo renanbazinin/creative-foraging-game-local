@@ -13,6 +13,10 @@ const LS_KEYS = {
   sensitivity: 'detectorSensitivity',
 };
 
+// Preview swatches when nothing saved yet — same red/blue fallback as the detector & session editor (Player A ≈ red, Player B ≈ blue).
+const DEFAULT_PLAYER_A_SWATCH = '#FF0000';
+const DEFAULT_PLAYER_B_SWATCH = '#0000FF';
+
 // Convert OpenCV-style HSV (H:0-180, S:0-255, V:0-255) to CSS rgb()
 const hsvToCssColor = (h, s, v) => {
   const H = (h || 0) * 2; // to 0-360
@@ -34,7 +38,10 @@ const hsvToCssColor = (h, s, v) => {
   return `rgb(${r}, ${g}, ${b})`;
 };
 
-const calibToCss = (calib) => calib ? hsvToCssColor(calib.h, calib.s, calib.v) : '#444';
+const calibToCss = (calib, role) => {
+  if (calib) return hsvToCssColor(calib.h, calib.s, calib.v);
+  return role === 'B' ? DEFAULT_PLAYER_B_SWATCH : DEFAULT_PLAYER_A_SWATCH;
+};
 
 function ColorCalibration() {
   const videoRef = useRef(null);
@@ -603,7 +610,7 @@ function ColorCalibration() {
           <div className="value" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span
               title="Player A color"
-              style={{ width: 16, height: 16, borderRadius: 3, border: '1px solid #666', display: 'inline-block', background: calibToCss(calibrationA) }}
+              style={{ width: 16, height: 16, borderRadius: 3, border: '1px solid #666', display: 'inline-block', background: calibToCss(calibrationA, 'A') }}
             />
             <span>{calibrationA ? `h${calibrationA.h.toFixed(0)} s${calibrationA.s.toFixed(0)} v${calibrationA.v.toFixed(0)}` : '—'}</span>
           </div>
@@ -617,7 +624,7 @@ function ColorCalibration() {
           <div className="value" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span
               title="Player B color"
-              style={{ width: 16, height: 16, borderRadius: 3, border: '1px solid #666', display: 'inline-block', background: calibToCss(calibrationB) }}
+              style={{ width: 16, height: 16, borderRadius: 3, border: '1px solid #666', display: 'inline-block', background: calibToCss(calibrationB, 'B') }}
             />
             <span>{calibrationB ? `h${calibrationB.h.toFixed(0)} s${calibrationB.s.toFixed(0)} v${calibrationB.v.toFixed(0)}` : '—'}</span>
           </div>
