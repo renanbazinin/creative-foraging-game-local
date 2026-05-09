@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createInitialBlocks, updateNeighbors, updateCanMove } from './gameLogic.js';
+import { createInitialBlocks, updateNeighbors, updateCanMove } from './gameLogic';
 
 describe('gameLogic', () => {
   it('creates ten blocks in a row', () => {

@@ -2,8 +2,9 @@ import js from '@eslint/js'
 import react from 'eslint-plugin-react'
 import reactHooks from 'eslint-plugin-react-hooks'
 import globals from 'globals'
+import tseslint from 'typescript-eslint'
 
-export default [
+export default tseslint.config(
   {
     ignores: ['dist/**', 'node_modules/**', 'coverage/**', 'public/**'],
   },
@@ -16,6 +17,10 @@ export default [
     },
   },
   js.configs.recommended,
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [...tseslint.configs.recommended],
+  },
   react.configs.flat.recommended,
   react.configs.flat['jsx-runtime'],
   {
@@ -50,4 +55,4 @@ export default [
       ],
     },
   },
-]
+)
