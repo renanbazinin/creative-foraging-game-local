@@ -1,0 +1,43 @@
+{
+  "name": "creative-foraging-web",
+  "version": "1.0.0",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/renanbazinin/openSourceCreativeForaginGame.git",
+    "directory": "Creative-Foraging-Detection-Media-Pipe/web-version"
+  },
+  "homepage": "https://renanbazinin.github.io/creative-foraging-game-local",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "format": "prettier --write ."
+  },
+  "dependencies": {
+    "@mediapipe/camera_utils": "^0.3.1640029074",
+    "@mediapipe/hands": "^0.4.1646424915",
+    "@mediapipe/selfie_segmentation": "^0.1.1675465747",
+    "@mediapipe/tasks-vision": "^0.10.11",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.16.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "eslint": "^9.16.0",
+    "eslint-plugin-react": "^7.37.2",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "gh-pages": "^6.3.0",
+    "globals": "^15.13.0",
+    "prettier": "^3.4.2",
+    "vite": "^5.0.8",
+    "vite-plugin-pwa": "^1.2.0",
+    "vitest": "^2.1.8"
+  }
+}

@@ -1,0 +1,534 @@
+.swipe-view-container {
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
+  display: flex;
+  flex-direction: column;
+  z-index: 10000;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Header */
+.swipe-view-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+}
+
+.swipe-view-header .close-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.swipe-view-header .close-btn:hover {
+  background: rgba(255, 68, 68, 0.8);
+  transform: scale(1.1);
+}
+
+.swipe-view-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.swipe-view-title h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: white;
+}
+
+.session-badge {
+  background: rgba(76, 175, 80, 0.3);
+  color: #81c784;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.progress-info {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Progress bar */
+.progress-bar-container {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #4CAF50, #8BC34A);
+  transition: width 0.3s ease;
+}
+
+/* Main content area */
+.swipe-view-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  gap: 20px;
+  overflow: hidden;
+}
+
+/* Side arrows */
+.swipe-arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 120px;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  opacity: 0.8;
+  flex-shrink: 0;
+}
+
+.swipe-arrow:hover {
+  opacity: 1;
+  transform: scale(1.05);
+}
+
+/* .swipe-arrow.left and .swipe-arrow.right have styles set dynamically in JS using cluster colors */
+
+.arrow-icon {
+  font-size: 32px;
+  font-weight: bold;
+  color: white;
+}
+
+.arrow-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+  margin-top: 8px;
+  text-align: center;
+}
+
+/* Swipe card container */
+.swipe-card-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  max-width: 500px;
+  width: 100%;
+}
+
+/* Swipe card */
+.swipe-card {
+  background: linear-gradient(145deg, #2a2a3e, #1e1e2e);
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  cursor: grab;
+  transition: transform 0.1s ease, opacity 0.3s ease;
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  touch-action: none;
+}
+
+.swipe-card.dragging {
+  cursor: grabbing;
+  transition: none;
+}
+
+.swipe-card.swiping-left {
+  animation: swipeOutLeft 0.3s ease forwards;
+}
+
+.swipe-card.swiping-right {
+  animation: swipeOutRight 0.3s ease forwards;
+}
+
+.swipe-card.swiping-skip {
+  animation: swipeOutDown 0.3s ease forwards;
+}
+
+@keyframes swipeOutLeft {
+  to {
+    transform: translateX(-150%) rotate(-30deg);
+    opacity: 0;
+  }
+}
+
+@keyframes swipeOutRight {
+  to {
+    transform: translateX(150%) rotate(30deg);
+    opacity: 0;
+  }
+}
+
+@keyframes swipeOutDown {
+  to {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+}
+
+/* Swipe indicators */
+.swipe-indicator {
+  position: absolute;
+  top: 20px;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 18px;
+  font-weight: bold;
+  color: white;
+  z-index: 10;
+  transition: opacity 0.1s ease;
+  pointer-events: none;
+}
+
+.swipe-indicator.left {
+  left: 20px;
+  transform: rotate(-15deg);
+}
+
+.swipe-indicator.right {
+  right: 20px;
+  transform: rotate(15deg);
+}
+
+/* Frame image */
+.frame-image-container {
+  width: 100%;
+  aspect-ratio: 4/3;
+  overflow: hidden;
+  background: #0a0a0a;
+}
+
+.frame-image-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+/* Frame info */
+.frame-info {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.info-label {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+}
+
+.info-value {
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Skip button */
+.skip-btn {
+  padding: 14px 32px;
+  background: rgba(158, 158, 158, 0.3);
+  border: 2px solid rgba(158, 158, 158, 0.5);
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 30px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.skip-btn:hover:not(:disabled) {
+  background: rgba(158, 158, 158, 0.5);
+  transform: scale(1.05);
+}
+
+.skip-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Footer */
+.swipe-view-footer {
+  padding: 12px 20px;
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+}
+
+.keyboard-hints {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.keyboard-hints span {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+}
+
+/* Complete screen */
+.swipe-complete {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  text-align: center;
+}
+
+.complete-icon {
+  font-size: 80px;
+  animation: bounce 0.6s ease;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-20px); }
+}
+
+.swipe-complete h2 {
+  color: white;
+  font-size: 32px;
+  margin: 0;
+}
+
+.complete-stats {
+  display: flex;
+  gap: 40px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.stat-value {
+  font-size: 36px;
+  font-weight: bold;
+  color: #4CAF50;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.done-btn {
+  padding: 14px 48px;
+  background: linear-gradient(135deg, #4CAF50, #45a049);
+  border: none;
+  color: white;
+  font-size: 18px;
+  font-weight: 600;
+  border-radius: 30px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 16px;
+}
+
+.done-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+}
+
+/* Loading state */
+.swipe-view-loading,
+.swipe-view-error,
+.swipe-view-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 16px;
+  color: white;
+}
+
+.loading-spinner,
+.updating-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #4CAF50;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.swipe-view-error button,
+.swipe-view-empty button {
+  padding: 12px 24px;
+  background: #4CAF50;
+  border: none;
+  color: white;
+  font-size: 16px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* Updating overlay */
+.updating-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .swipe-view-header {
+    padding: 10px 16px;
+  }
+
+  .swipe-view-title h1 {
+    font-size: 16px;
+  }
+
+  .session-badge {
+    display: none;
+  }
+
+  .swipe-arrow {
+    display: none;
+  }
+
+  .swipe-view-main {
+    padding: 12px;
+  }
+
+  .swipe-card-container {
+    max-width: 100%;
+  }
+
+  .swipe-card {
+    max-width: 100%;
+    border-radius: 16px;
+  }
+
+  .frame-info {
+    padding: 16px;
+  }
+
+  .keyboard-hints {
+    display: none;
+  }
+
+  .swipe-view-footer {
+    padding: 16px;
+  }
+
+  /* Touch hints for mobile */
+  .swipe-view-footer::before {
+    content: 'Swipe left for A • Swipe right for B';
+    display: block;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .swipe-view-header .close-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+  }
+
+  .swipe-view-title h1 {
+    font-size: 14px;
+  }
+
+  .progress-info {
+    font-size: 12px;
+  }
+
+  .frame-image-container {
+    aspect-ratio: 1/1;
+  }
+
+  .complete-stats {
+    gap: 24px;
+  }
+
+  .stat-value {
+    font-size: 28px;
+  }
+
+  .skip-btn {
+    padding: 12px 24px;
+    font-size: 14px;
+  }
+}
+
+/* Large screens */
+@media (min-width: 1200px) {
+  .swipe-card {
+    max-width: 450px;
+  }
+
+  .swipe-arrow {
+    width: 100px;
+    height: 140px;
+  }
+
+  .arrow-icon {
+    font-size: 40px;
+  }
+
+  .arrow-label {
+    font-size: 14px;
+  }
+}
+
+/* Touch device optimization */
+@media (hover: none) {
+  .swipe-arrow:hover {
+    transform: none;
+  }
+
+  .skip-btn:hover:not(:disabled) {
+    transform: none;
+    background: rgba(158, 158, 158, 0.3);
+  }
+}

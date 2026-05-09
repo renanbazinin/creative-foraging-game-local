@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bracelet Detector</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+        'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+        sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      background-color: #1a1a1a;
+      color: white;
+      padding: 20px;
+    }
+
+    .detector-container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      color: #4CAF50;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .video-container {
+      position: relative;
+      background-color: #000;
+      border: 2px solid #4CAF50;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+
+    #videoElement {
+      display: none;
+    }
+
+    #canvasElement {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .info-panel {
+      background-color: rgba(255, 255, 255, 0.1);
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+    }
+
+    .status-display {
+      font-size: 24px;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+
+    .status-red { color: #ff0000; }
+    .status-blue { color: #0066ff; }
+    .status-none { color: #888; }
+
+    .log-info {
+      color: #aaa;
+      font-size: 14px;
+      margin-top: 10px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      cursor: pointer;
+      border-radius: 5px;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+
+    button:hover {
+      background-color: #45a049;
+      transform: scale(1.05);
+    }
+
+    button:active {
+      transform: scale(0.95);
+    }
+
+    .error-message {
+      color: #ff6b6b;
+      background-color: rgba(255, 107, 107, 0.1);
+      padding: 10px;
+      border-radius: 5px;
+      margin-top: 10px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="detector-container">
+    <h1>Bracelet Color Detector</h1>
+    
+    <div class="video-container">
+      <video id="videoElement" autoplay playsinline></video>
+      <canvas id="canvasElement"></canvas>
+    </div>
+
+    <div class="info-panel">
+      <div class="status-display" id="statusDisplay">
+        Status: <span id="statusText" class="status-none">None</span>
+      </div>
+      <div class="log-info" id="logInfo">
+        Logs recorded: <strong>0</strong> | Last log: <span>Never</span>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button onclick="downloadJSON()">📥 Download JSON</button>
+      <button onclick="downloadTXT()">📄 Download TXT</button>
+      <button onclick="clearLogs()">🗑️ Clear Logs</button>
+    </div>
+
+    <div class="error-message" id="errorMessage"></div>
+  </div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "@mediapipe/hands": "https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js",
+        "@mediapipe/camera_utils": "https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1620248357/camera_utils.js"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import { Hands } from '@mediapipe/hands';
+    import { Camera } from '@mediapipe/camera_utils';
+
+    // Color detection thresholds
+    const COLOR_THRESHOLDS = {
+      red: {
+        lower1: [0, 120, 70],
+        upper1: [10, 255, 255],
+        lower2: [170, 120, 70],
+        upper2: [180, 255, 255]
+      },
+      blue: {
+        lower: [100, 150, 70],
+        upper: [130, 255, 255]
+      },
+      pixelThreshold: 200,
+      roiSize: 60
+    };
+
+    let detectionLog = [];
+    let lastLogTime = Date.now();
+    const LOG_INTERVAL = 1000; // Log every 1 second
+
+    // RGB to HSV conversion
+    function rgbToHsv(r, g, b) {
+      r /= 255; g /= 255; b /= 255;
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      const diff = max - min;
+      
+      let h = 0;
+      if (diff !== 0) {
+        if (max === r) h = 60 * (((g - b) / diff) % 6);
+        else if (max === g) h = 60 * (((b - r) / diff) + 2);
+        else h = 60 * (((r - g) / diff) + 4);
+      }
+      if (h < 0) h += 360;
+      
+      const s = max === 0 ? 0 : (diff / max) * 255;
+      const v = max * 255;
+      
+      return [h, s, v];
+    }
+
+    function detectBraceletColor(imageData, x, y) {
+      const canvas = document.getElementById('canvasElement');
+      const roiSize = COLOR_THRESHOLDS.roiSize;
+      const halfRoi = Math.floor(roiSize / 2);
+      
+      let redCount = 0;
+      let blueCount = 0;
+      
+      for (let dy = -halfRoi; dy < halfRoi; dy++) {
+        for (let dx = -halfRoi; dx < halfRoi; dx++) {
+          const px = x + dx;
+          const py = y + dy;
+          
+          if (px >= 0 && px < canvas.width && py >= 0 && py < canvas.height) {
+            const idx = (py * canvas.width + px) * 4;
+            const r = imageData.data[idx];
+            const g = imageData.data[idx + 1];
+            const b = imageData.data[idx + 2];
+            
+            const [h, s, v] = rgbToHsv(r, g, b);
+            
+            // Check red (two ranges)
+            const redRange1 = h >= COLOR_THRESHOLDS.red.lower1[0] && h <= COLOR_THRESHOLDS.red.upper1[0] &&
+                            s >= COLOR_THRESHOLDS.red.lower1[1] && s <= COLOR_THRESHOLDS.red.upper1[1] &&
+                            v >= COLOR_THRESHOLDS.red.lower1[2] && v <= COLOR_THRESHOLDS.red.upper1[2];
+            const redRange2 = h >= COLOR_THRESHOLDS.red.lower2[0] && h <= COLOR_THRESHOLDS.red.upper2[0] &&
+                            s >= COLOR_THRESHOLDS.red.lower2[1] && s <= COLOR_THRESHOLDS.red.upper2[1] &&
+                            v >= COLOR_THRESHOLDS.red.lower2[2] && v <= COLOR_THRESHOLDS.red.upper2[2];
+            
+            if (redRange1 || redRange2) redCount++;
+            
+            // Check blue
+            if (h >= COLOR_THRESHOLDS.blue.lower[0] && h <= COLOR_THRESHOLDS.blue.upper[0] &&
+                s >= COLOR_THRESHOLDS.blue.lower[1] && s <= COLOR_THRESHOLDS.blue.upper[1] &&
+                v >= COLOR_THRESHOLDS.blue.lower[2] && v <= COLOR_THRESHOLDS.blue.upper[2]) {
+              blueCount++;
+            }
+          }
+        }
+      }
+      
+      if (redCount > COLOR_THRESHOLDS.pixelThreshold) return 'Red';
+      if (blueCount > COLOR_THRESHOLDS.pixelThreshold) return 'Blue';
+      return 'None';
+    }
+
+    function updateStatus(status) {
+      const statusText = document.getElementById('statusText');
+      statusText.textContent = status;
+      statusText.className = `status-${status.toLowerCase()}`;
+    }
+
+    function logDetection(status) {
+      const now = Date.now();
+      if (now - lastLogTime >= LOG_INTERVAL) {
+        const entry = {
+          timestamp: new Date().toISOString(),
+          color: status
+        };
+        detectionLog.push(entry);
+        lastLogTime = now;
+        
+        // Update UI
+        const logInfo = document.getElementById('logInfo');
+        logInfo.innerHTML = `Logs recorded: <strong>${detectionLog.length}</strong> | Last log: <span>${new Date().toLocaleTimeString()}</span>`;
+        
+        // Save to localStorage
+        localStorage.setItem('braceletDetectionLog', JSON.stringify(detectionLog));
+      }
+    }
+
+    function onResults(results) {
+      const canvas = document.getElementById('canvasElement');
+      const ctx = canvas.getContext('2d');
+      const video = document.getElementById('videoElement');
+      
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      ctx.save();
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
+      
+      let detectedColor = 'None';
+      
+      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        for (const landmarks of results.multiHandLandmarks) {
+          // Draw hand landmarks
+          for (let i = 0; i < landmarks.length; i++) {
+            const landmark = landmarks[i];
+            const x = landmark.x * canvas.width;
+            const y = landmark.y * canvas.height;
+            
+            ctx.beginPath();
+            ctx.arc(x, y, 5, 0, 2 * Math.PI);
+            ctx.fillStyle = '#00FF00';
+            ctx.fill();
+          }
+          
+          // Check wrist for bracelet (landmark 0)
+          const wrist = landmarks[0];
+          const wristX = Math.floor(wrist.x * canvas.width);
+          const wristY = Math.floor(wrist.y * canvas.height);
+          
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const color = detectBraceletColor(imageData, wristX, wristY);
+          
+          if (color !== 'None') {
+            detectedColor = color;
+          }
+          
+          // Draw ROI box
+          const roiSize = COLOR_THRESHOLDS.roiSize;
+          ctx.strokeStyle = color === 'Red' ? '#FF0000' : color === 'Blue' ? '#0066FF' : '#00FF00';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(wristX - roiSize/2, wristY - roiSize/2, roiSize, roiSize);
+        }
+      }
+      
+      updateStatus(detectedColor);
+      logDetection(detectedColor);
+      ctx.restore();
+    }
+
+    // Initialize MediaPipe Hands
+    const hands = new Hands({
+      locateFile: (file) => {
+        return `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${file}`;
+      }
+    });
+
+    hands.setOptions({
+      maxNumHands: 2,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
+
+    hands.onResults(onResults);
+
+    // Initialize camera
+    const video = document.getElementById('videoElement');
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then((stream) => {
+        video.srcObject = stream;
+        video.onloadedmetadata = () => {
+          const camera = new Camera(video, {
+            onFrame: async () => {
+              await hands.send({ image: video });
+            },
+            width: 640,
+            height: 480
+          });
+          camera.start();
+        };
+      })
+      .catch((err) => {
+        const errorMsg = document.getElementById('errorMessage');
+        errorMsg.style.display = 'block';
+        errorMsg.textContent = `Camera error: ${err.message}. Please allow camera access and refresh.`;
+      });
+
+    // Load existing logs from localStorage
+    const savedLogs = localStorage.getItem('braceletDetectionLog');
+    if (savedLogs) {
+      detectionLog = JSON.parse(savedLogs);
+      const logInfo = document.getElementById('logInfo');
+      logInfo.innerHTML = `Logs recorded: <strong>${detectionLog.length}</strong> | Last log: <span>${detectionLog.length > 0 ? new Date(detectionLog[detectionLog.length - 1].timestamp).toLocaleTimeString() : 'Never'}</span>`;
+    }
+
+    // Export functions to global scope
+    window.downloadJSON = function() {
+      const blob = new Blob([JSON.stringify(detectionLog, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bracelet_detection_${new Date().toISOString().replace(/:/g, '-')}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    window.downloadTXT = function() {
+      const text = detectionLog.map(entry => 
+        `${entry.timestamp} - ${entry.color}`
+      ).join('\n');
+      const blob = new Blob([text], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bracelet_detection_${new Date().toISOString().replace(/:/g, '-')}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    window.clearLogs = function() {
+      if (confirm('Are you sure you want to clear all detection logs?')) {
+        detectionLog = [];
+        localStorage.removeItem('braceletDetectionLog');
+        const logInfo = document.getElementById('logInfo');
+        logInfo.innerHTML = `Logs recorded: <strong>0</strong> | Last log: <span>Never</span>`;
+      }
+    };
+  </script>
+</body>
+</html>

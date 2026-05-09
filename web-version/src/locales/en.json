@@ -1,0 +1,37 @@
+{
+  "startDialog": {
+    "title": "Creative Foraging Game",
+    "subtitle": "Session setup — runs in your browser",
+    "localOnly": "Local only",
+    "localOnlyTitle": "All session data stays on your device in the folder you choose.",
+    "aboutLink": "About & Learn more",
+    "folderNoticeStrong": "Save folder required.",
+    "folderNoticeRest": "This app runs entirely in your browser — there is no cloud server. When you click \"Choose data folder\", your browser will ask permission to read and write that folder. You must allow access so sessions and moves can be saved. Use Chrome or Edge on desktop for full support.",
+    "chooseFolder": "Choose data folder",
+    "changeFolder": "Change data folder",
+    "checkingFolder": "Checking saved folder…",
+    "folderOk": "Folder connected — you can start the game.",
+    "folderWarn": "No folder yet — connect to continue.",
+    "participantId": "ID:",
+    "condition": "Condition:",
+    "timeMinutes": "Time (in minutes):",
+    "calibrate": "Calibrate Colors",
+    "admin": "Admin",
+    "ok": "OK",
+    "browserNoFolder": "Your browser cannot pick a save folder. Use Google Chrome or Microsoft Edge on desktop.",
+    "folderRequired": "Choose a folder and allow the browser to save there before starting.",
+    "fillFields": "Please fill in all fields"
+  },
+  "game": {
+    "welcomeMessage": "Welcome to the creative game!\n\nYour task is to move around blocks to create interesting and beautiful figures.\n\nEverytime you have created a figure you like, tap on the gallery in the upper right corner in order to save your figure to the gallery.\n\nThe experiment proceeds through {{minutes}} minutes.\n\nTell the experimenter when you are ready for the practice round.",
+    "practiceDoneMessage": "This was the end of the practice round.\n\nLet the experimenter know when you are ready to begin the actual experiment.",
+    "byeMessage": "The experiment is done. Thank you very much for your participation!",
+    "galleryLabel": "Save figure to gallery",
+    "galleryAlt": "Gallery thumbnail",
+    "galleryPlaceholder": "Gallery",
+    "timerPrefix": "Time:",
+    "blockLabel": "Block {{id}}{{movable}}",
+    "movableSuffix": " — movable",
+    "messageHint": "(Click to continue)"
+  }
+}

@@ -1,0 +1,31 @@
+.App {
+  width: 100vw;
+  height: 100vh;
+  background-color: #000;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.reopen-detector-btn {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  cursor: pointer;
+  border-radius: 5px;
+  font-size: 14px;
+  z-index: 1000;
+  box-shadow: 0 2px 10px rgba(76, 175, 80, 0.5);
+  transition: all 0.3s ease;
+}
+
+.reopen-detector-btn:hover {
+  background-color: #45a049;
+  transform: scale(1.05);
+}
