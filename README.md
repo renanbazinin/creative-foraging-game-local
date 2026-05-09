@@ -1,4 +1,4 @@
-# Creative Foraging (MediaPipe): Web + PsychoPy
+﻿# Creative Foraging (MediaPipe): Web + PsychoPy
 
 **GitHub repository:** [renanbazinin/creative-foraging-game-local](https://github.com/renanbazinin/creative-foraging-game-local) — **this `README.md` is the repository homepage** (full documentation).
 
