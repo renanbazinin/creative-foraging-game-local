@@ -70,16 +70,16 @@ screenshots/
 screenshots history/
 *.log
 
-# Node.js / React
-web version/node_modules/
-web version/dist/
-web version/build/
-web version/.vite/
-web version/.cache/
-web version/npm-debug.log*
-web version/yarn-debug.log*
-web version/yarn-error.log*
-web version/pnpm-debug.log*
+# Node.js / React (web app)
+web-version/node_modules/
+web-version/dist/
+web-version/build/
+web-version/.vite/
+web-version/.cache/
+web-version/npm-debug.log*
+web-version/yarn-debug.log*
+web-version/yarn-error.log*
+web-version/pnpm-debug.log*
 
 # Server
 server/node_modules/

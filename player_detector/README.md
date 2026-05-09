@@ -1,5 +1,7 @@
 # Player Bracelet Detector (Red/Blue)
 
+**Project overview and web app architecture:** see the repository root [`README.md`](../../README.md). **License:** [`LICENSE`](../../LICENSE).
+
 Detect the color of a wrist bracelet (red/blue/none) using a webcam feed and MediaPipe Hands. Logs the detected status once per second to both TXT and JSONL files.
 
 ## What it does
