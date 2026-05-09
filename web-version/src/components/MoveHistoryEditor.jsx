@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import './MoveHistoryEditor.css';
 import {
   getActiveDataRoot,
@@ -50,7 +50,6 @@ function MoveHistoryEditor({ sessionGameId }) {
 
   const [colorA, setColorA] = useState('#FF0000'); // Default red
   const [colorB, setColorB] = useState('#0000FF'); // Default blue
-  const [showColorPicker, setShowColorPicker] = useState(false);
   const [colorProcessing, setColorProcessing] = useState(false);
   const [colorSuggestions, setColorSuggestions] = useState({});
   const [colorProgress, setColorProgress] = useState({ current: 0, total: 0 });
@@ -79,8 +78,43 @@ function MoveHistoryEditor({ sessionGameId }) {
   const [swapProgress, setSwapProgress] = useState({ current: 0, total: 0 });
   const [showSwapModal, setShowSwapModal] = useState(false);
   const [pendingSwapOperation, setPendingSwapOperation] = useState(null);
+  const [showMoreMethods, setShowMoreMethods] = useState(false);
+  const [showHelpModal, setShowHelpModal] = useState(false);
+  const moreMethodsDropdownRef = useRef(null);
 
+  useEffect(() => {
+    if (!showHelpModal) return;
+    const onKey = (e) => {
+      if (e.key === 'Escape') setShowHelpModal(false);
+    };
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [showHelpModal]);
 
+  useEffect(() => {
+    if (!showMoreMethods) return;
+    const close = (e) => {
+      if (moreMethodsDropdownRef.current && !moreMethodsDropdownRef.current.contains(e.target)) {
+        setShowMoreMethods(false);
+      }
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') setShowMoreMethods(false);
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('touchstart', close);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('touchstart', close);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [showMoreMethods]);
 
   const detectPlayerByColor = useCallback(
     async (frameData) => {
@@ -1009,7 +1043,7 @@ function MoveHistoryEditor({ sessionGameId }) {
   const playerACount = session.moves?.filter(m => m.player === 'Player A').length || 0;
   const playerBCount = session.moves?.filter(m => m.player === 'Player B').length || 0;
   const noneCount = session.moves?.filter(m => !m.player || m.player === 'None' || m.player === 'Unknown').length || 0;
-
+  const clothDebugPreviewCount = Object.keys(clothDebugPreviews).length;
 
   return (
     <div className="move-editor-container">
@@ -1018,7 +1052,22 @@ function MoveHistoryEditor({ sessionGameId }) {
           ← Back to Admin
         </button>
         <div className="move-editor-title">
-          <h1>Move History Editor</h1>
+          <div className="move-editor-title-heading-row">
+            <h1 id="move-editor-main-title">Move History Editor</h1>
+            <button
+              type="button"
+              className="move-editor-help-btn"
+              onClick={() => setShowHelpModal(true)}
+              aria-haspopup="dialog"
+              aria-expanded={showHelpModal}
+              aria-controls="move-editor-help-dialog"
+            >
+              <span className="move-editor-help-btn__icon" aria-hidden="true">
+                ?
+              </span>
+              Help
+            </button>
+          </div>
           <div className="session-info">
             <span className="session-id">Session: {sessionGameId}</span>
             <span className="session-meta">Participant: {session.subjectId}</span>
@@ -1053,6 +1102,51 @@ function MoveHistoryEditor({ sessionGameId }) {
               )}
             </button>
           </div>
+
+          {clothDebugPreviewCount > 0 && (
+            <div className="title-toolbar-row">
+              <div
+                className="cloth-debug-tile"
+                role="group"
+                aria-label="Cloth segmentation debug previews"
+              >
+                <div className="cloth-debug-tile-head">
+                  <span className="cloth-debug-tile-label">Cloth debug</span>
+                  <span className="cloth-debug-tile-meta">
+                    {clothDebugPreviewCount} preview{clothDebugPreviewCount !== 1 ? 's' : ''}
+                  </span>
+                </div>
+                <div className="cloth-debug-tile-actions">
+                  <button
+                    type="button"
+                    className={`cloth-debug-toggle ${showDebugView ? 'cloth-debug-toggle--on' : ''}`}
+                    onClick={() => setShowDebugView(!showDebugView)}
+                    aria-pressed={showDebugView}
+                  >
+                    <span className="cloth-debug-toggle__icon" aria-hidden="true">
+                      🔬
+                    </span>
+                    <span className="cloth-debug-toggle__text">
+                      {showDebugView ? 'Hide on cards' : 'Show on cards'}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="cloth-debug-clear"
+                    onClick={() => {
+                      setShowDebugView(false);
+                      setClothDebugPreviews({});
+                    }}
+                  >
+                    <span className="cloth-debug-clear__icon" aria-hidden="true">
+                      🗑
+                    </span>
+                    <span>Clear all</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
         <div className="header-center-group">
           <div className="phase-filter">
@@ -1106,152 +1200,143 @@ function MoveHistoryEditor({ sessionGameId }) {
         </div>
 
         <div className="header-controls-group">
-          {/* Bracelet Colors - Shared by both AI and Color */}
-          <div className="bracelet-colors-controls">
-            <button
-              className="color-picker-toggle"
-              onClick={() => setShowColorPicker(!showColorPicker)}
-            >
-              Bracelet Colors
-            </button>
-            {showColorPicker && (
-              <div className="color-picker-panel">
-                <div className="color-input-group">
-                  <label>Player A:</label>
-                  <input
-                    type="color"
-                    value={colorA}
-                    onChange={(e) => setColorA(e.target.value)}
-                  />
-                  <span>{colorA}</span>
-                </div>
-                <div className="color-input-group">
-                  <label>Player B:</label>
-                  <input
-                    type="color"
-                    value={colorB}
-                    onChange={(e) => setColorB(e.target.value)}
-                  />
-                  <span>{colorB}</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Color Identification Controls */}
           <div className="color-controls">
+            <div className="identify-primary-row">
+              <button
+                type="button"
+                className="ai-btn allall-btn identify-all-primary"
+                onClick={handleAllAllIdentifyAll}
+                disabled={allAllProcessing}
+              >
+                {allAllProcessing ? 'Identifying…' : 'Identify All'}
+              </button>
+              <button
+                type="button"
+                className="ai-btn allall-btn identify-all-secondary"
+                onClick={handleAllAllIdentifyUnknown}
+                disabled={allAllProcessing}
+              >
+                {allAllProcessing ? 'Identifying…' : 'Identify Unknown'}
+              </button>
+              <p className="scan-area-tip">
+                Tip: set the scan area below (General / Manual and region) for better results.
+              </p>
+            </div>
 
-
-            {Object.keys(clothDebugPreviews).length > 0 && (
-              <>
+            <div className="identify-secondary-actions">
+              <div className="more-methods-dropdown" ref={moreMethodsDropdownRef}>
                 <button
-                  className={`ai-btn debug-btn ${showDebugView ? 'active' : ''}`}
-                  onClick={() => setShowDebugView(!showDebugView)}
-                  style={{
-                    backgroundColor: showDebugView ? '#4CAF50' : '#666',
-                    marginLeft: '20px'
-                  }}
+                  type="button"
+                  className="more-methods-dropdown-trigger"
+                  onClick={() => setShowMoreMethods((v) => !v)}
+                  aria-expanded={showMoreMethods}
+                  aria-haspopup="menu"
+                  title="Cloth / Color runs and bracelet hue picks"
                 >
-                  {showDebugView ? '🔬 Debug View ON' : '🔬 Show Debug View'}
+                  <span className="more-methods-dropdown-label">More methods</span>
+                  <span className={`more-methods-chevron ${showMoreMethods ? 'open' : ''}`} aria-hidden />
                 </button>
-                <button
-                  className="ai-btn debug-btn"
-                  onClick={() => {
-                    setShowDebugView(false);
-                    setClothDebugPreviews({});
-                  }}
-                  style={{ backgroundColor: '#ff5722' }}
-                >
-                  🗑️ Clear Debug
-                </button>
-              </>
-            )}
+                {showMoreMethods && (
+                  <div className="more-methods-dropdown-panel" role="menu">
+                    <div className="more-methods-bracelet-strip">
+                      <span className="more-methods-label">Bracelet colors</span>
+                      <p className="more-methods-bracelet-hint">
+                        Used for Cloth and Color identification (defaults load from session when available).
+                      </p>
+                      <div className="more-methods-bracelet-inputs">
+                        <div className="more-methods-color-field">
+                          <label htmlFor="more-methods-color-a">Player A</label>
+                          <input
+                            id="more-methods-color-a"
+                            type="color"
+                            value={colorA}
+                            onChange={(e) => setColorA(e.target.value)}
+                            aria-label="Player A bracelet color"
+                          />
+                          <span className="more-methods-color-hex">{colorA}</span>
+                        </div>
+                        <div className="more-methods-color-field">
+                          <label htmlFor="more-methods-color-b">Player B</label>
+                          <input
+                            id="more-methods-color-b"
+                            type="color"
+                            value={colorB}
+                            onChange={(e) => setColorB(e.target.value)}
+                            aria-label="Player B bracelet color"
+                          />
+                          <span className="more-methods-color-hex">{colorB}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <span className="more-methods-label">Cloth &amp; color runs</span>
+                    <div className="more-methods-buttons">
+                      <button
+                        type="button"
+                        className="ai-btn"
+                        role="menuitem"
+                        onClick={handleClothIdentifyAll}
+                        disabled={clothProcessing || allAllProcessing || colorProcessing}
+                        title="Cloth-class segmentation: suggest players for all moves with frames"
+                      >
+                        {clothProcessing ? '👕 Cloth…' : '👕 Cloth (all)'}
+                      </button>
+                      <button
+                        type="button"
+                        className="ai-btn"
+                        role="menuitem"
+                        onClick={handleClothIdentifyUnknown}
+                        disabled={clothProcessing || allAllProcessing || colorProcessing}
+                        title="Cloth-class segmentation: unknown / none moves only"
+                      >
+                        {clothProcessing ? '👕 Cloth…' : '👕 Cloth (unknown)'}
+                      </button>
+                      <button
+                        type="button"
+                        className="ai-btn"
+                        role="menuitem"
+                        onClick={handleColorIdentifyAll}
+                        disabled={colorProcessing || allAllProcessing || clothProcessing}
+                        title="Segmentation + bracelet colors: all filtered moves with frames"
+                      >
+                        {colorProcessing ? '🎨 Color…' : '🎨 Color (all)'}
+                      </button>
+                      <button
+                        type="button"
+                        className="ai-btn"
+                        role="menuitem"
+                        onClick={handleColorIdentifyUnknown}
+                        disabled={colorProcessing || allAllProcessing || clothProcessing}
+                        title="Segmentation + bracelet colors: unknown moves only"
+                      >
+                        {colorProcessing ? '🎨 Color…' : '🎨 Color (unknown)'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
 
-            <button
-              className="ai-btn allall-btn"
-              onClick={handleAllAllIdentifyAll}
-              disabled={allAllProcessing}
-            >
-              {allAllProcessing ? '🌐 Identifying by All All...' : '🌐 Identify by All All'}
-            </button>
-            <button
-              className="ai-btn allall-btn"
-              onClick={handleAllAllIdentifyUnknown}
-              disabled={allAllProcessing}
-            >
-              {allAllProcessing ? '🌐 Identifying by All All...' : '🌐 Identify by All Unknown'}
-            </button>
-            <button
-              type="button"
-              className="ai-btn"
-              onClick={handleClothIdentifyAll}
-              disabled={clothProcessing || allAllProcessing || colorProcessing}
-              title="Cloth-class segmentation: suggest players for all moves with frames"
-            >
-              {clothProcessing ? '👕 Cloth…' : '👕 Cloth (all)'}
-            </button>
-            <button
-              type="button"
-              className="ai-btn"
-              onClick={handleClothIdentifyUnknown}
-              disabled={clothProcessing || allAllProcessing || colorProcessing}
-              title="Cloth-class segmentation: unknown / none moves only"
-            >
-              {clothProcessing ? '👕 Cloth…' : '👕 Cloth (unknown)'}
-            </button>
-            <button
-              type="button"
-              className="ai-btn"
-              onClick={handleColorIdentifyAll}
-              disabled={colorProcessing || allAllProcessing || clothProcessing}
-              title="Segmentation + bracelet colors: all filtered moves with frames"
-            >
-              {colorProcessing ? '🎨 Color…' : '🎨 Color (all)'}
-            </button>
-            <button
-              type="button"
-              className="ai-btn"
-              onClick={handleColorIdentifyUnknown}
-              disabled={colorProcessing || allAllProcessing || clothProcessing}
-              title="Segmentation + bracelet colors: unknown moves only"
-            >
-              {colorProcessing ? '🎨 Color…' : '🎨 Color (unknown)'}
-            </button>
-            <button
-              onClick={handleOpenSwipeView}
-              style={{
-                background: 'linear-gradient(135deg, #9C27B0, #673AB7)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                padding: '8px 16px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: 'bold',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                boxShadow: '0 2px 8px rgba(156, 39, 176, 0.3)'
-              }}
-              title="Open Swipe View to review frames"
-            >
-              👆 Swipe View ({(() => {
-                // Count unique frames needing review: unknown/none OR has unconfirmed suggestion
-                const unknownIds = new Set(
-                  (session?.moves || [])
-                    .filter(m => m.camera_frame && (!m.player || m.player === 'Unknown' || m.player === 'None'))
-                    .map(m => getMoveId(m))
-                );
-                const suggestionIds = new Set(
-                  Object.entries(colorSuggestions)
-                    .filter(([, s]) => (s.confidence || 0) * 100 < confirmThreshold)
-                    .map(([id]) => id)
-                );
-                // Merge both sets
-                suggestionIds.forEach(id => unknownIds.add(id));
-                return unknownIds.size;
-              })()})
-            </button>
+              <button
+                type="button"
+                className="swipe-view-toolbar-btn"
+                onClick={handleOpenSwipeView}
+                title="Open Swipe View to review frames"
+              >
+                👆 Swipe View ({(() => {
+                  const unknownIds = new Set(
+                    (session?.moves || [])
+                      .filter(m => m.camera_frame && (!m.player || m.player === 'Unknown' || m.player === 'None'))
+                      .map(m => getMoveId(m))
+                  );
+                  const suggestionIds = new Set(
+                    Object.entries(colorSuggestions)
+                      .filter(([, s]) => (s.confidence || 0) * 100 < confirmThreshold)
+                      .map(([id]) => id)
+                  );
+                  suggestionIds.forEach(id => unknownIds.add(id));
+                  return unknownIds.size;
+                })()})
+              </button>
+            </div>
             <div className="color-anchor-toggle" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
 
               <div className="scan-mode-radios" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
@@ -1837,8 +1922,165 @@ function MoveHistoryEditor({ sessionGameId }) {
         totalBatches={pendingSwapOperation?.confirmationInfo?.totalBatches || 1}
         batchSize={pendingSwapOperation?.confirmationInfo?.batchSize || 600}
       />
-    </div >
 
+      {showHelpModal && (
+        <div
+          className="move-editor-help-overlay"
+          role="presentation"
+          onClick={() => setShowHelpModal(false)}
+        >
+          <div
+            id="move-editor-help-dialog"
+            className="move-editor-help-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="move-editor-help-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="move-editor-help-close"
+              onClick={() => setShowHelpModal(false)}
+              aria-label="Close help"
+            >
+              ✕
+            </button>
+            <h2 id="move-editor-help-title" className="move-editor-help-title">
+              How to use this editor
+            </h2>
+            <p className="move-editor-help-lead">
+              Use the tools below the session title to suggest or fix who moved (Player A, Player B, etc.)
+              for each saved camera frame. Your filters control which moves are included when you run a batch
+              job.
+            </p>
+
+            <section className="move-editor-help-section">
+              <h3>Identify All &amp; Identify Unknown</h3>
+              <p>
+                These run the <strong>All–All</strong> pipeline: the app segments each camera frame, clusters
+                visual patterns across moves, and proposes Player A / B labels. It is the recommended first pass.
+              </p>
+              <ul>
+                <li>
+                  <strong>Identify All</strong> — runs on every filtered move that has a camera frame (respects
+                  Practice / Experiment and player filters).
+                </li>
+                <li>
+                  <strong>Identify Unknown</strong> — only moves that are still unlabeled or marked Unknown /
+                  None, so you can refine without overwriting confident picks.
+                </li>
+              </ul>
+              <p>
+                After a run, review suggestions on the cards (and thresholds in the analytics strip when shown).
+                Confirm suggestions individually or in bulk where offered.
+              </p>
+            </section>
+
+            <section className="move-editor-help-section">
+              <h3>Scan area — why it matters</h3>
+              <p>
+                Segmentation and color checks focus on a <strong>vertical band</strong> of the image (usually where
+                hands and bracelets appear). If that band misses the hands, guesses get noisy.
+              </p>
+              <ul>
+                <li>
+                  <strong>General</strong> — uses a preset band from the <strong>Bottom</strong> or{' '}
+                  <strong>Top</strong> of the frame. The <strong>percentage</strong> slider controls how tall that
+                  band is (deeper into the frame when higher).
+                </li>
+                <li>
+                  <strong>Manual</strong> — draw the band on a sample frame when participants sit off-center or the
+                  camera angle is unusual. Use <strong>Change scan area</strong> to adjust it later.
+                </li>
+              </ul>
+              <p>
+                Set scan options <strong>before</strong> running Identify All / Unknown or the Cloth / Color tools,
+                since they all reuse this region.
+              </p>
+            </section>
+
+            <section className="move-editor-help-section">
+              <h3>BG sensitivity</h3>
+              <p>
+                Controls how aggressively the model separates people / foreground from the background.{' '}
+                <strong>Higher</strong> values keep more pixels as foreground (useful if bracelets look faint);{' '}
+                <strong>lower</strong> values trim more aggressively if the mask is too noisy.
+              </p>
+            </section>
+
+            <section className="move-editor-help-section">
+              <h3>More methods</h3>
+              <p>Advanced identification paths (same scan area as above).</p>
+              <ul>
+                <li>
+                  <strong>Bracelet colors</strong> — hex picks for Player A and B, used by Cloth and Color runs
+                  (defaults may load from session metadata).
+                </li>
+                <li>
+                  <strong>Cloth (all / unknown)</strong> — groups clothing appearance across frames to suggest
+                  players.
+                </li>
+                <li>
+                  <strong>Color (all / unknown)</strong> — compares segmented regions to the bracelet colors.
+                </li>
+              </ul>
+            </section>
+
+            <section className="move-editor-help-section">
+              <h3>Swipe View</h3>
+              <p>
+                Opens a swipe-based reviewer for frames that need attention — useful for quickly confirming or
+                correcting labels with gestures.
+              </p>
+            </section>
+
+            <section className="move-editor-help-section">
+              <h3>Filters &amp; Swap A and B</h3>
+              <ul>
+                <li>
+                  <strong>Practice / Experiment</strong> — limits which moves batch jobs and counts apply to.
+                </li>
+                <li>
+                  <strong>Player filters</strong> — narrow the list; combined with Identify All / Unknown as
+                  described above.
+                </li>
+                <li>
+                  <strong>⇄ Swap A and B</strong> — permanently swaps every Player A assignment with Player B in
+                  storage when the two players were labeled backwards.
+                </li>
+              </ul>
+            </section>
+
+            <section className="move-editor-help-section">
+              <h3>Move cards</h3>
+              <ul>
+                <li>
+                  Click a card image to enlarge it.
+                </li>
+                <li>
+                  Use the <strong>player dropdown</strong> to fix a label manually; changes save to this session.
+                </li>
+                <li>
+                  <strong>🎨</strong> on a card runs color-based identification for that single frame.
+                </li>
+              </ul>
+            </section>
+
+            <section className="move-editor-help-section move-editor-help-section--muted">
+              <h3>Cloth debug (when visible)</h3>
+              <p>
+                After some Cloth runs you may see debug previews. <strong>Show on cards</strong> overlays them on
+                thumbnails; <strong>Clear all</strong> removes previews from memory.
+              </p>
+            </section>
+
+            <button type="button" className="move-editor-help-done" onClick={() => setShowHelpModal(false)}>
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

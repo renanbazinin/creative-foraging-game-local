@@ -18,3 +18,36 @@ body {
   width: 100%;
   height: 100%;
 }
+
+/* Move History Editor: body was overflow:hidden — allow window scroll */
+body.body--documentScroll {
+  overflow-x: hidden;
+  overflow-y: auto;
+  height: auto;
+  min-height: 100vh;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: #4caf50 #1a1a1a;
+}
+
+body.body--documentScroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+body.body--documentScroll::-webkit-scrollbar-track {
+  background: #1a1a1a;
+}
+
+body.body--documentScroll::-webkit-scrollbar-thumb {
+  background: #4caf50;
+  border-radius: 5px;
+}
+
+body.body--documentScroll::-webkit-scrollbar-thumb:hover {
+  background: #45a049;
+}
+
+#root.root--documentScroll {
+  height: auto;
+  min-height: 100vh;
+}

@@ -32,6 +32,9 @@
     "timerPrefix": "Time:",
     "blockLabel": "Block {{id}}{{movable}}",
     "movableSuffix": " — movable",
-    "messageHint": "(Click to continue)"
+    "messageHint": "(Click to continue)",
+    "postExperimentTitle": "What would you like to do next?",
+    "startNewExperiment": "Start New Experiment",
+    "goToAdminEditPlayers": "Go to Admin (Edit Players)"
   }
 }

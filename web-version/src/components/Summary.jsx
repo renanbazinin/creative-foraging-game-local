@@ -576,7 +576,7 @@ function Summary({
                   className={`edit-mode-toggle ${editMode ? 'active' : ''}`}
                   onClick={() => setEditMode(!editMode)}
                 >
-                  {editMode ? '✓ Done Editing' : 'Edit Players'}
+                  {editMode ? '✓ Done' : 'Quick Edit Players'}
                 </button>
               )}
             </div>

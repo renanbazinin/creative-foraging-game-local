@@ -13,6 +13,7 @@ import {
   isFileSystemAccessSupported
 } from '../services/localSessionStore';
 import { sessionDocumentToMovesCsv } from '../utils/sessionCsv';
+import { ADMIN_FOCUS_SESSION_GAME_ID_KEY } from '../constants/adminNavigation';
 import './Admin.css';
 
 const transformSessionToGameData = (session) => {
@@ -129,6 +130,23 @@ function Admin() {
       const sessionList = await listSessionSummaries(root);
       setSessions(sessionList);
       setSelectedSessionId((prev) => {
+        let pendingId = null;
+        try {
+          pendingId = sessionStorage.getItem(ADMIN_FOCUS_SESSION_GAME_ID_KEY);
+        } catch {
+          pendingId = null;
+        }
+        if (pendingId) {
+          const found = sessionList.some((session) => session.sessionGameId === pendingId);
+          try {
+            sessionStorage.removeItem(ADMIN_FOCUS_SESSION_GAME_ID_KEY);
+          } catch {
+            /* ignore */
+          }
+          if (found) {
+            return pendingId;
+          }
+        }
         if (prev && sessionList.some((session) => session.sessionGameId === prev)) {
           return prev;
         }

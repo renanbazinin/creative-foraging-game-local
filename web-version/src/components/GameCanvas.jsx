@@ -11,6 +11,7 @@ import {
   resetPositions
 } from '../utils/gameLogic';
 import { t } from '../locales';
+import { ADMIN_FOCUS_SESSION_GAME_ID_KEY } from '../constants/adminNavigation';
 
 const BLOCK_SIZE_PX = 60; // pixels
 const GRID_STEP = 0.07;
@@ -28,6 +29,7 @@ function GameCanvas({ config, interfaceHidden = false }) {
   const [showMessage, setShowMessage] = useState(true);
   const [messageText, setMessageText] = useState('');
   const [gameEnded, setGameEnded] = useState(false);
+  const [showPostExperimentChoice, setShowPostExperimentChoice] = useState(false);
   const [canvasVars, setCanvasVars] = useState({
     blockSize: BLOCK_SIZE_PX,
     bottomPadding: DEFAULT_BOTTOM_PADDING
@@ -470,16 +472,14 @@ function GameCanvas({ config, interfaceHidden = false }) {
   }, [handleKeyPress]);
 
   const closeMessage = () => {
-    // Handle game end (bye message) - redirect to start dialog
+    // Handle game end (bye message) - show next-step choice (Admin vs new session)
     if (gameEnded && messageText === byeMessage) {
-      console.log('[GameCanvas] Game ended - redirecting to start dialog');
-      // Unhide interface if it was hidden
+      console.log('[GameCanvas] Game ended - showing post-experiment choice');
       if (window.toggleInterface) {
-        window.toggleInterface(false); // Unhide
+        window.toggleInterface(false);
       }
-      // Redirect to start dialog
-      window.location.hash = '#/';
-      window.location.reload();
+      setShowMessage(false);
+      setShowPostExperimentChoice(true);
       return;
     }
 
@@ -515,6 +515,22 @@ function GameCanvas({ config, interfaceHidden = false }) {
 
   const handleContextMenu = (e) => {
     e.preventDefault(); // Disable right-click context menu
+  };
+
+  const handlePostExperimentStartNew = () => {
+    window.location.hash = '#/';
+    window.location.reload();
+  };
+
+  const handlePostExperimentGoToAdmin = () => {
+    try {
+      if (config?.sessionGameId != null && config.sessionGameId !== '') {
+        sessionStorage.setItem(ADMIN_FOCUS_SESSION_GAME_ID_KEY, String(config.sessionGameId));
+      }
+    } catch (e) {
+      console.warn('[GameCanvas] Could not stash session for Admin:', e);
+    }
+    window.location.hash = '#/admin';
   };
 
   return (
@@ -596,6 +612,40 @@ function GameCanvas({ config, interfaceHidden = false }) {
           <div className="message-box" role="dialog" aria-modal="true" aria-live="polite">
             {messageText}
             <div className="message-hint">{t('game.messageHint')}</div>
+          </div>
+        </div>
+      )}
+
+      {showPostExperimentChoice && (
+        <div
+          className="message-overlay post-experiment-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="post-exp-title"
+        >
+          <div
+            className="message-box post-experiment-box"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="post-exp-title" className="post-experiment-title">
+              {t('game.postExperimentTitle')}
+            </h2>
+            <div className="post-experiment-actions">
+              <button
+                type="button"
+                className="post-experiment-btn post-experiment-btn-primary"
+                onClick={handlePostExperimentStartNew}
+              >
+                {t('game.startNewExperiment')}
+              </button>
+              <button
+                type="button"
+                className="post-experiment-btn post-experiment-btn-secondary"
+                onClick={handlePostExperimentGoToAdmin}
+              >
+                {t('game.goToAdminEditPlayers')}
+              </button>
+            </div>
           </div>
         </div>
       )}

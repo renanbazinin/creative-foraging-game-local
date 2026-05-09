@@ -41,6 +41,23 @@ function App() {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
+  // Move History Editor needs document scroll; body/#root default to overflow:hidden + fixed height
+  useEffect(() => {
+    const isMoveEditor = /^#\/admin\/edit-moves\/.+/.test(currentRoute);
+    const root = document.getElementById('root');
+    if (isMoveEditor) {
+      document.body.classList.add('body--documentScroll');
+      root?.classList.add('root--documentScroll');
+    } else {
+      document.body.classList.remove('body--documentScroll');
+      root?.classList.remove('root--documentScroll');
+    }
+    return () => {
+      document.body.classList.remove('body--documentScroll');
+      root?.classList.remove('root--documentScroll');
+    };
+  }, [currentRoute]);
+
   // Expose toggleInterface function globally (for game end)
   useEffect(() => {
     window.toggleInterface = (hide) => {
@@ -215,8 +232,10 @@ function App() {
     ));
   }
 
+  const appScrollDocument = Boolean(editMovesMatch);
+
   return (
-    <div className="App">
+    <div className={`App${appScrollDocument ? ' App--documentScroll' : ''}`}>
       {body}
     </div>
   );
