@@ -4,8 +4,8 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "https://github.com/renanbazinin/openSourceCreativeForaginGame.git",
-    "directory": "Creative-Foraging-Detection-Media-Pipe/web-version"
+    "url": "https://github.com/renanbazinin/creative-foraging-game-local.git",
+    "directory": "web-version"
   },
   "homepage": "https://renanbazinin.github.io/creative-foraging-game-local",
   "scripts": {

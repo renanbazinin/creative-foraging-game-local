@@ -1,8 +1,8 @@
 # Creative Foraging — Web Version (developer README)
 
-**Full project context** (research goals, architecture, session formats, Admin routes): [**repository root `README.md`**](../../README.md).
+**Full project context** (research goals, architecture, session formats, Admin routes): [**repository root `README.md`**](../README.md).
 
-**Privacy / IRB helpers:** [`PRIVACY.md`](../../PRIVACY.md)
+**Privacy / IRB helpers:** [`PRIVACY.md`](../PRIVACY.md)
 
 **Live site:** [GitHub Pages](https://renanbazinin.github.io/creative-foraging-game-local/)
 
@@ -69,7 +69,7 @@ This hides in-game shortcuts to Admin, Detector2, and the “open detector windo
 
 Meaning: files from the **old server + Admin pipeline**, not arbitrary DB dumps. `_id` / `moveId` semantics match that legacy shape.
 
-- **Column order** for `session.csv` and Admin CSV downloads: `LEGACY_EXPORT_CSV_COLUMNS` in [`src/utils/sessionCsv.js`](src/utils/sessionCsv.js). Full column list and normalization rules: [**root README**](../../README.md).
+- **Column order** for `session.csv` and Admin CSV downloads: `LEGACY_EXPORT_CSV_COLUMNS` in [`src/utils/sessionCsv.js`](src/utils/sessionCsv.js). Full column list and normalization rules: [**root README**](../README.md).
 - **Manual import:** Under `sessions/`, subfolders may contain paired `<stem>.json` + `<stem>.csv`. Prefer JSON; CSV fallback via parser in `sessionCsv.js`. Canonical layout after import: `sessions/<id>/session.json` + `session.csv`.
 
 ## Progressive Web App (PWA)
