@@ -12,6 +12,26 @@ Browser-based **Creative Foraging** task (drag-and-connect blocks, gallery saves
 
 ---
 
+## How it works
+
+The bracelet channel depends on a **fixed camera** aimed at the display so MediaPipe can see each participant’s **wrist / hand root** while they play. Mount the camera **above** the screen looking straight down, or **below** the front edge of the panel—whichever gives the clearest view of the strip where hands meet the task. In **two-player** sessions, players take turns or move one at a time; the illustrations show the **red** player moving while the rig keeps both people in a workable field of view.
+
+Give each person a **stable color cue** at the wrist: **two different bright bracelets** or **two distinct long sleeves** so red vs blue classification stays readable from the overhead (or under-edge) camera.
+
+In real setups, participants usually keep their **hands much closer to the screen** than these wide overview drawings suggest—plan lighting and distance so the palm base and band stay in frame when they reach for blocks.
+
+**Strongly recommended:** define a **manual scan area** in the app—a rectangle on the **screen plane** that matches the region where the camera **reliably sees the root of the palm** (and thus the sleeve or bracelet). Color attribution is most trustworthy inside that region; areas where the wrist drops out of frame or is occluded should stay outside the scan box.
+
+### Figure 1 — Both players; red player moving (camera sees the play area)
+
+![Overhead setup: two players at a horizontal screen, red player moving, camera above the display viewing the interaction area](https://i.imgur.com/5uFmAR5.jpeg)
+
+### Figure 2 — Blue player playing
+
+![Same rig with the blue player reaching toward the screen; camera tracks the interaction strip](https://i.imgur.com/imlZwgV.jpeg)
+
+---
+
 ## Research goals
 
 - **Primary task:** Participants arrange ten blocks on a grid to build figures they find interesting; they can save snapshots to a **gallery**. The design follows creative/foraging-style exploration paradigms used in cognitive science.
