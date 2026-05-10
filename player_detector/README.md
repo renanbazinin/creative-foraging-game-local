@@ -2,6 +2,8 @@
 
 **Project overview and web app architecture:** see the repository root [`README.md`](../README.md). **License:** [`LICENSE`](../LICENSE).
 
+**Optional / legacy reference:** You **do not** need this Python tool to run the main **Creative Foraging** web app ([`web-version/`](../web-version/)), which has its own in-browser MediaPipe bracelet flow. This folder is a **standalone desktop prototype** kept for continuity with an **older project**—install Python here only if you explicitly want this logger.
+
 Detect the color of a wrist bracelet (red/blue/none) using a webcam feed and MediaPipe Hands. Logs the detected status once per second to both TXT and JSONL files.
 
 ## What it does

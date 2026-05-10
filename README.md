@@ -8,6 +8,8 @@
 
 Browser-based **Creative Foraging** task (drag-and-connect blocks, gallery saves, timed experiment) with optional **MediaPipe Hands** bracelet color detection and **local-first** session files (no app server). A **PsychoPy** implementation and a **Python** wrist-band prototype live alongside the web app in this repository.
 
+**You do not need Python** to run or deploy the task. The maintained path is the **web app** under [`web-version/`](web-version/). The PsychoPy files, `ppc3.py`, and [`player_detector/`](player_detector/) are **optional** extras kept as **reference** to an **older project**—use them only if you deliberately want that stack.
+
 **Monorepo checkout:** If your local folder is nested (for example `…/openSourceCreativeForaginGame/Creative-Foraging-Detection-Media-Pipe/`), treat this directory as the same root [shown on GitHub](https://github.com/renanbazinin/creative-foraging-game-local); paths below are relative to this project root.
 
 ---
@@ -78,13 +80,15 @@ More detail for developers: [`web-version/README.md`](web-version/README.md), [`
 
 ## Implementations
 
-### Python (PsychoPy)
+The **Python** sections below are **not** prerequisites for the browser workflow; they document legacy/reference code paths only.
+
+### Python (PsychoPy) — optional, older reference
 
 - Entry: [`CreativeForaging_Source.py`](CreativeForaging_Source.py)
 - Logging utilities: [`ppc3.py`](ppc3.py)
 - Typical setup (Windows): Python 3.10 venv; install `psychopy`, `pandas`, `numpy`, `scipy`, `matplotlib`, `mediapipe`, `opencv-python`; run `python CreativeForaging_Source.py` (see **Quick start** below).
 
-### Python bracelet prototype
+### Python bracelet prototype — optional, older reference
 
 - [`player_detector/bracelet_detector.py`](player_detector/bracelet_detector.py) writes wrist-color status to TXT/JSONL under `player_detector/logs/`. See [`player_detector/README.md`](player_detector/README.md).
 
@@ -229,7 +233,9 @@ npm run dev
 
 Open **http://localhost:3000**. Grant **camera** and **folder** access when prompted. Full commands, PWA notes, GitHub Pages deploy, and troubleshooting: [`web-version/README.md`](web-version/README.md).
 
-### Python (PsychoPy)
+### Python (PsychoPy) — optional only
+
+Only if you need the legacy PsychoPy build (not required for the web app):
 
 ```powershell
 py -3.10 -m venv .venv

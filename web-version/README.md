@@ -8,6 +8,8 @@
 
 This folder is the React + Vite SPA: local-first sessions (`sessions/<id>/session.json` + `session.csv`), optional MediaPipe bracelet detection, Admin/import tooling. Details below focus on **commands**, **configuration**, and **troubleshooting**.
 
+**Python is not required.** The repository root also ships PsychoPy scripts and a standalone Python bracelet logger under `player_detector/`—those exist as **optional reference** from an **older project**. For the standard deployment and studies, **Node/npm and this folder are enough**.
+
 ## Browser support
 
 | Feature | Chrome / Edge (desktop) | Firefox | Safari |
