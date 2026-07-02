@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, startTransition } from 'react';
 import './MoveHistoryEditor.css';
 import {
   getActiveDataRoot,
@@ -658,11 +658,7 @@ function MoveHistoryEditor({ sessionGameId }) {
           sensitivity: backgroundSensitivity
         });
 
-        if (result?.analytics) {
-          setAllAllAnalytics(result.analytics);
-        }
-
-        // Store debug previews from results (shared with cloth debug previews)
+        // Collect debug previews (shared with cloth debug previews).
         const debugPreviews = {};
         if (result?.assignments) {
           Object.entries(result.assignments).forEach(([moveId, info]) => {
@@ -670,9 +666,6 @@ function MoveHistoryEditor({ sessionGameId }) {
               debugPreviews[moveId] = info.stats.debugPreview;
             }
           });
-        }
-        if (Object.keys(debugPreviews).length > 0) {
-          setClothDebugPreviews(prev => ({ ...prev, ...debugPreviews })); // Merge with existing previews
         }
 
         const newSuggestions = {};
@@ -694,19 +687,27 @@ function MoveHistoryEditor({ sessionGameId }) {
         }
 
         const suggestionCount = Object.keys(newSuggestions).length;
-        if (suggestionCount === 0) {
-          const targetText = mode === 'all' ? 'moves' : 'unknown moves';
-          alert(`All-All method did not find suggestions for any ${targetText}.`);
-        } else {
-          setColorSuggestions((prev) => ({
-            ...prev,
-            ...newSuggestions
-          }));
-          const targetText = mode === 'all' ? 'moves' : 'unknown moves';
-          alert(
-            `All-All method suggested players for ${suggestionCount} ${targetText}. Review and confirm suggestions below.`
-          );
-        }
+
+        // Clear the busy state first (urgent), then apply the large result state
+        // as a non-urgent transition so re-rendering the whole move list keeps
+        // the UI responsive instead of blocking for a few seconds.
+        setAllAllProcessing(false);
+        startTransition(() => {
+          if (result?.analytics) setAllAllAnalytics(result.analytics);
+          if (Object.keys(debugPreviews).length > 0) {
+            setClothDebugPreviews((prev) => ({ ...prev, ...debugPreviews }));
+          }
+          if (suggestionCount > 0) {
+            setColorSuggestions((prev) => ({ ...prev, ...newSuggestions }));
+          }
+        });
+
+        // Defer the (blocking) summary dialog so the results can paint first.
+        const targetText = mode === 'all' ? 'moves' : 'unknown moves';
+        const summary = suggestionCount === 0
+          ? `All-All method did not find suggestions for any ${targetText}.`
+          : `All-All method suggested players for ${suggestionCount} ${targetText}. Review and confirm suggestions below.`;
+        setTimeout(() => alert(summary), 0);
       } catch (err) {
         console.error('[MoveHistoryEditor] All-All identification failed:', err);
         alert(friendlyIdentifyError(err, { manual: colorAnchor === 'manually' }));
@@ -1715,6 +1716,8 @@ function MoveHistoryEditor({ sessionGameId }) {
                         : move.camera_frame
                     }
                     alt={`Move ${index + 1}`}
+                    loading="lazy"
+                    decoding="async"
                   />
                   <div className="image-overlay">🔍 Click to enlarge</div>
                   {showDebugView && clothDebugPreviews[getMoveId(move)] && (
@@ -1888,7 +1891,7 @@ function MoveHistoryEditor({ sessionGameId }) {
           <div className="image-modal" onClick={() => setExpandedImage(null)}>
             <div className="image-modal-content" onClick={(e) => e.stopPropagation()}>
               <button className="close-modal" onClick={() => setExpandedImage(null)}>✕</button>
-              <img src={expandedImage} alt="Expanded view" />
+              <img src={expandedImage} alt="Expanded view" decoding="async" />
             </div>
           </div>
         )
