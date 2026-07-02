@@ -2,7 +2,6 @@ import { FilesetResolver, ImageSegmenter } from '@mediapipe/tasks-vision';
 // Import the local model file URL (Vite syntax)
 import multiclassModelUrl from './selfie_multiclass_256x256.tflite?url';
 import {
-    runKMeans, // re-exported for consumers/tests that import from here
     rgbToHex,
     sampleForegroundPixels,
     buildFrameResult,
@@ -268,4 +267,4 @@ const buildDebugPreview = ({
     return debugCanvas.toDataURL('image/png');
 };
 
-export { identifyPlayersByAllAll, runKMeans };
+export { identifyPlayersByAllAll };
