@@ -10,6 +10,7 @@ import {
 } from '../services/localSessionStore';
 import { identifyPlayerByColor, identifyPlayerBySegmentation, identifyPlayersByCloth } from '../utils/colorDetector';
 import { identifyPlayersByAllAll } from '../utils/colorDetectorGeneral';
+import { describeTooSmallScanArea, friendlyIdentifyError } from '../utils/identifyMessages';
 import { swapPlayersAB } from '../utils/swapPlayers';
 import ColorPreviewModal from './ColorPreviewModal';
 import ManualScanSelector from './ManualScanSelector';
@@ -622,6 +623,20 @@ function MoveHistoryEditor({ sessionGameId }) {
         return;
       }
 
+      // Guard against an empty/too-small manual scan area, which would sample no
+      // pixels and fail deep inside the detector with a confusing error.
+      if (colorAnchor === 'manually') {
+        if (!manualScanBounds) {
+          alert('Please select a manual scan area first, or turn off manual selection.');
+          return;
+        }
+        const tooSmall = describeTooSmallScanArea(manualScanBounds);
+        if (tooSmall) {
+          alert(tooSmall);
+          return;
+        }
+      }
+
       setAllAllProcessing(true);
       setAllAllAnalytics(null);
 
@@ -694,7 +709,7 @@ function MoveHistoryEditor({ sessionGameId }) {
         }
       } catch (err) {
         console.error('[MoveHistoryEditor] All-All identification failed:', err);
-        alert('All-All identification failed: ' + err.message);
+        alert(friendlyIdentifyError(err, { manual: colorAnchor === 'manually' }));
       } finally {
         setAllAllProcessing(false);
       }
