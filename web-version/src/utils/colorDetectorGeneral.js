@@ -94,6 +94,7 @@ const getImageSegmenter = async () => {
  * @param {Number} options.minPixels - Minimum pixels required per frame (default: 5)
  * @param {Number} options.sensitivity - Background confidence threshold (default: 0.85)
  * @param {Object} options.playerColors - Optional { 'Player A': hex, 'Player B': hex } for calibration matching
+ * @param {Function} options.onProgress - Optional callback ({ phase, current, total }) fired per frame and once before clustering
  * @returns {Object} - { assignments, clusters, analytics }
  */
 const identifyPlayersByAllAll = async (frames = [], options = {}) => {
@@ -108,10 +109,15 @@ const identifyPlayersByAllAll = async (frames = [], options = {}) => {
     const manualBounds = options.manualBounds || null;
     const playerColors = options.playerColors || null;
     const backgroundThreshold = options.sensitivity || 0.85;
+    const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
 
     const framesToProcess = frames.slice(0, maxFrames);
+    const total = framesToProcess.length;
     const results = [];
     let skippedFrames = 0;
+    let processed = 0;
+
+    if (onProgress) onProgress({ phase: 'scanning', current: 0, total });
 
     for (const frame of framesToProcess) {
         try {
@@ -181,8 +187,13 @@ const identifyPlayersByAllAll = async (frames = [], options = {}) => {
         } catch (err) {
             console.warn('[ColorDetectorGeneral] Analysis failed for frame', frame.moveId, err);
             skippedFrames += 1;
+        } finally {
+            processed += 1;
+            if (onProgress) onProgress({ phase: 'scanning', current: processed, total });
         }
     }
+
+    if (onProgress) onProgress({ phase: 'clustering', current: total, total });
 
     const output = clusterAndLabel(results, { playerColors, verbose: true });
     output.analytics.totalFrames = framesToProcess.length;

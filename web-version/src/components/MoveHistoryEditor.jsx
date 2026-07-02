@@ -65,6 +65,7 @@ function MoveHistoryEditor({ sessionGameId }) {
   const [clothDebugPreviews, setClothDebugPreviews] = useState({}); // { moveId: debugPreview }
   const [showDebugView, setShowDebugView] = useState(false); // Toggle for all moves
   const [allAllProcessing, setAllAllProcessing] = useState(false);
+  const [allAllProgress, setAllAllProgress] = useState({ phase: 'scanning', current: 0, total: 0 });
   const [allAllAnalytics, setAllAllAnalytics] = useState(null);
   const [analyticsSort, setAnalyticsSort] = useState('chronological');
   const [confirmThreshold, setConfirmThreshold] = useState(55); // Default 55%
@@ -638,6 +639,7 @@ function MoveHistoryEditor({ sessionGameId }) {
       }
 
       setAllAllProcessing(true);
+      setAllAllProgress({ phase: 'scanning', current: 0, total: movesWithFrames.length });
       setAllAllAnalytics(null);
 
       try {
@@ -655,7 +657,8 @@ function MoveHistoryEditor({ sessionGameId }) {
           minPixels: 80,
           manualBounds: colorAnchor === 'manually' ? manualScanBounds : null,
           playerColors: { 'Player A': colorA, 'Player B': colorB },
-          sensitivity: backgroundSensitivity
+          sensitivity: backgroundSensitivity,
+          onProgress: (p) => setAllAllProgress(p)
         });
 
         // Collect debug previews (shared with cloth debug previews).
@@ -1060,6 +1063,9 @@ function MoveHistoryEditor({ sessionGameId }) {
   const playerBCount = session.moves?.filter(m => m.player === 'Player B').length || 0;
   const noneCount = session.moves?.filter(m => !m.player || m.player === 'None' || m.player === 'Unknown').length || 0;
   const clothDebugPreviewCount = Object.keys(clothDebugPreviews).length;
+  const allAllProgressPercent = allAllProgress.total > 0
+    ? Math.min(100, Math.round((allAllProgress.current / allAllProgress.total) * 100))
+    : 0;
 
   return (
     <div className="move-editor-container">
@@ -1089,7 +1095,7 @@ function MoveHistoryEditor({ sessionGameId }) {
             <span className="session-meta">Participant: {session.subjectId}</span>
             <span className="session-meta">Condition: {session.condition}</span>
           </div>
-          <div className="player-stats" style={{ marginTop: '5px', fontSize: '0.9em', display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <div className="player-stats" style={{ fontSize: '0.9em', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
             <span style={{ color: colorA, fontWeight: 'bold' }}>Player A: {playerACount}</span>
             <span style={{ color: colorB, fontWeight: 'bold' }}>Player B: {playerBCount}</span>
             <button
@@ -1185,7 +1191,7 @@ function MoveHistoryEditor({ sessionGameId }) {
               Experiment ({experimentCount})
             </button>
           </div>
-          <div className="player-filter" style={{ marginTop: '4px' }}>
+          <div className="player-filter">
             <button
               className={`filter-btn ${filterPlayer === 'all' ? 'active' : ''}`}
               onClick={() => setFilterPlayer('all')}
@@ -1224,7 +1230,7 @@ function MoveHistoryEditor({ sessionGameId }) {
                 onClick={handleAllAllIdentifyAll}
                 disabled={allAllProcessing}
               >
-                {allAllProcessing ? 'Identifying…' : 'Identify All'}
+                {allAllProcessing ? `Identifying… ${allAllProgressPercent}%` : 'Identify All'}
               </button>
               <button
                 type="button"
@@ -1232,11 +1238,34 @@ function MoveHistoryEditor({ sessionGameId }) {
                 onClick={handleAllAllIdentifyUnknown}
                 disabled={allAllProcessing}
               >
-                {allAllProcessing ? 'Identifying…' : 'Identify Unknown'}
+                {allAllProcessing ? `Identifying… ${allAllProgressPercent}%` : 'Identify Unknown'}
               </button>
-              <p className="scan-area-tip">
-                Tip: set the scan area below (General / Manual and region) for better results.
-              </p>
+              {allAllProcessing ? (
+                <div
+                  className="allall-progress"
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={allAllProgressPercent}
+                >
+                  <div className="allall-progress-track">
+                    <div
+                      className="allall-progress-fill"
+                      style={{ width: `${allAllProgressPercent}%` }}
+                    />
+                  </div>
+                  <span className="allall-progress-text">
+                    {allAllProgress.phase === 'clustering'
+                      ? 'Grouping players…'
+                      : `Analyzing frames ${allAllProgress.current}/${allAllProgress.total}`}
+                    {' '}({allAllProgressPercent}%)
+                  </span>
+                </div>
+              ) : (
+                <p className="scan-area-tip">
+                  Tip: set the scan area below for better results.
+                </p>
+              )}
             </div>
 
             <div className="identify-secondary-actions">
@@ -1457,7 +1486,7 @@ function MoveHistoryEditor({ sessionGameId }) {
               )}
 
               {/* Background Sensitivity Slider */}
-              <div className="bg-sensitivity-control" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+              <div className="bg-sensitivity-control" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <label style={{ fontSize: '12px', color: '#aaa' }}>BG Sensitivity:</label>
                 <span style={{ fontSize: '12px', color: '#fff', minWidth: '35px' }}>{backgroundSensitivity.toFixed(2)}</span>
                 <input
