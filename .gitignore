@@ -1,0 +1,105 @@
+# General
+node_modules/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Build outputs
+dist/
+build/
+
+# Environment files
+.env
+*.env
+.env.*
+!.env.example
+server/.env
+server/.env.*
+!server/.env.example
+
+# IDE
+.vscode/
+.idea/
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+.venv_mini/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs and Screenshots
+logfiles/
+logfiles history/
+screenshots/
+screenshots history/
+*.log
+
+# Node.js / React
+web version/node_modules/
+web version/dist/
+web version/build/
+web version/.vite/
+web version/.cache/
+web version/npm-debug.log*
+web version/yarn-debug.log*
+web version/yarn-error.log*
+web version/pnpm-debug.log*
+
+# Server
+server/node_modules/
+server/dist/
+server/build/
+server/.env
+server/.env.*
+!server/.env.example
+server/npm-debug.log*
+server/yarn-debug.log*
+
+# Environment variables (additional patterns)
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# CSV data files (keep structure but ignore actual data)
+*.csv
+
+# Temporary files
+*.tmp
+*.temp
