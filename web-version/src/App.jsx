@@ -233,10 +233,16 @@ function App() {
   }
 
   const appScrollDocument = Boolean(editMovesMatch);
+  const isAdminRoute = currentRoute.startsWith('#/admin');
 
   return (
     <div className={`App${appScrollDocument ? ' App--documentScroll' : ''}`}>
       {body}
+      {isAdminRoute && (
+        <footer className="admin-version-footer" aria-label="Build version">
+          v{__APP_VERSION__} · {__APP_GIT_SHA__} · {__APP_BUILD_DATE__}
+        </footer>
+      )}
     </div>
   );
 }

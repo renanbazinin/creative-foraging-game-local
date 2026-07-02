@@ -33,6 +33,9 @@ export default tseslint.config(
       sourceType: 'module',
       globals: {
         ...globals.browser,
+        __APP_VERSION__: 'readonly',
+        __APP_GIT_SHA__: 'readonly',
+        __APP_BUILD_DATE__: 'readonly',
       },
       parserOptions: {
         ecmaFeatures: { jsx: true },
